@@ -1,9 +1,0 @@
-einops
-hydra-core
-wandb
-torch
-pandas
-matplotlib
-scipy
-h5py
-torchdiffeq
