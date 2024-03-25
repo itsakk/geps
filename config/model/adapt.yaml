@@ -1,0 +1,43 @@
+defaults:
+  - _self_
+  - data: null
+  - optim: null
+  - inr: null
+  - wandb: null
+
+data:
+  dataset_name: "pendulum"
+  dir: "/home/kassai/code/FUELS/exp_gen/adapt"
+  seed: 123
+
+optim:
+  epochs: 1000
+  batch_size_train: 16
+  batch_size_val: 32
+  lr: 0.001
+  init_type: 'default'
+  init_gain: 0.15
+
+model:
+  hidden_c: 64
+  state_c: 2
+  code_c: 2
+  method: 'rk4'
+  factor: 1
+  pde_params: False
+  is_complete: False
+  type_augment: "serie"
+  options:
+
+pretrain:
+  run_name:
+  
+wandb:
+  entity: "spatiotemp-isir"
+  project: "pdegen"
+  name: 
+  id: 
+  dir:
+  sweep_id:
+  saved_checkpoint : False
+  checkpoint_path :

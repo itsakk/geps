@@ -1,0 +1,14 @@
+- data.dataset_name=lv
+- optim.batch_size_train=4
+- optim.batch_size_val=32
+- data.seed=123
+- optim.epochs=20000
+- optim.lr=0.001
+- model.hidden_c=64
+- model.state_c=2
+- model.code_c=2
+- optim.init_type={A:{type:orthogonal,gain:1},B:{type:orthogonal,gain:1},weight:{type:orthogonal,gain:1}}
+- model.factor=1
+- model.is_complete=False
+- optim.regul=False
+- model.type_augment=serie

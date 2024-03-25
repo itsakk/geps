@@ -1,0 +1,8 @@
+*.pyc
+*.bak
+*.dat
+*.dir
+*.png
+*.err
+*.out
+*.ipynb
