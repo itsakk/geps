@@ -2,7 +2,7 @@ import torch
 import math
 from torch.utils.data import DataLoader       
 from fuels.utils import SubsetRamdomSampler, SubsetSequentialSampler
-from fuels.datasets.pendulum import DampledPendulum
+from fuels.datasets.pendulum import DampedPendulum, DampedDrivenPendulum
 from fuels.datasets.lv import LotkaVolterraDataset
 from fuels.datasets.gs import GrayScottDataset
 from fuels.datasets.burgers import BurgersF
@@ -89,8 +89,8 @@ def param_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
     dataset_test_params['path'] = buffer_filepath+'_test'
     dataset_test_params['time_horizon'] = 20
     
-    dataset_train = DampledPendulum(**dataset_train_params)
-    dataset_test  = DampledPendulum(**dataset_test_params)
+    dataset_train = DampedPendulum(**dataset_train_params)
+    dataset_test  = DampedPendulum(**dataset_test_params)
 
     dataloader_train = DataLoaderODE(dataset_train, batch_size_train , dataset_train.num_env, is_train=True)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
@@ -198,8 +198,8 @@ def param_adapt_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25
     dataset_test_params['path'] = buffer_filepath+'_test_ada'
     dataset_test_params['time_horizon'] = 20
     
-    dataset_train = DampledPendulum(**dataset_train_params)
-    dataset_test  = DampledPendulum(**dataset_test_params)
+    dataset_train = DampedPendulum(**dataset_train_params)
+    dataset_test  = DampedPendulum(**dataset_test_params)
 
     dataloader_train = DataLoaderODE(dataset_train, batch_size_train, dataset_train.num_env, is_train=True)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
