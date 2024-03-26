@@ -6,6 +6,7 @@ from fuels.datasets.pendulum import DampedPendulum, DampedDrivenPendulum
 from fuels.datasets.lv import LotkaVolterraDataset
 from fuels.datasets.gs import GrayScottDataset
 from fuels.datasets.burgers import BurgersF
+from fuels.datasets.pendulum_cases import *
 
 def DataLoaderODE(dataset, minibatch_size, n_env, is_train=True):
     if is_train:
@@ -65,41 +66,52 @@ def param_lv(buffer_filepath, batch_size_train=25, batch_size_val=25):
     params = torch.cat((betas.unsqueeze(-1), deltas.unsqueeze(-1)), axis = 1)
     return dataloader_train, dataloader_test, params
 
-def param_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
+def param_pendulum(dataset_name, buffer_filepath, batch_size_train=25, batch_size_val=25):
+
+    case = dataset_name.split('-')[1]
+
+    if case == 'ideal':
+        case_params = params_ideal
+    elif case == 'damped':
+        case_params = params_damped
+    elif case == 'driven':
+        case_params = params_driven
+    elif case == 'damped_driven':
+        case_params = params_damped_driven
+    elif case == 'chaotic':
+        case_params = params_chaotic
+    else:
+        case_params = params_train
+
     dataset_train_params = {
         'ndata_per_env': batch_size_train,
-        'time_horizon': 10,
+        'time_horizon': 500,
         'dt': 0.5, 
         'group': 'train',
         'path': buffer_filepath+'_train',
-        'params' : [{"alpha": 0.3, "T0": 5},
-                    {"alpha": 0.3, "T0": 6},
-                    {"alpha": 0.3, "T0": 7},
-                    {"alpha": 0.4, "T0": 5},
-                    {"alpha": 0.4, "T0": 6},
-                    {"alpha": 0.4, "T0": 7},
-                    {"alpha": 0.5, "T0": 5},
-                    {"alpha": 0.5, "T0": 6},
-                    {"alpha": 0.5, "T0": 7}]
+        'params' : case_params
     }
+    
     dataset_test_params = dict()
     dataset_test_params.update(dataset_train_params)
     dataset_test_params['ndata_per_env'] = batch_size_val
     dataset_test_params['group'] = 'test'
     dataset_test_params['path'] = buffer_filepath+'_test'
-    dataset_test_params['time_horizon'] = 20
+    dataset_test_params['time_horizon'] = 500
     
-    dataset_train = DampedPendulum(**dataset_train_params)
-    dataset_test  = DampedPendulum(**dataset_test_params)
+    dataset_train = DampedDrivenPendulum(**dataset_train_params)
+    dataset_test  = DampedDrivenPendulum(**dataset_test_params)
 
     dataloader_train = DataLoaderODE(dataset_train, batch_size_train , dataset_train.num_env, is_train=True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
+    dataloader_test  = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
 
     # True parameters
-    alphas = torch.Tensor([0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5])
-    t0 = torch.Tensor([5, 6, 7, 5, 6, 7, 5, 6, 7]) 
-    omegas = (2 * math.pi / t0) ** 2
-    params = torch.cat((omegas.unsqueeze(-1), alphas.unsqueeze(-1)), axis = 1)
+    alphas = torch.Tensor([dyns["alpha"] for dyns in case_params])
+    w0s = torch.Tensor([dyns["w0"] for dyns in case_params])
+    wfs = torch.Tensor([dyns["wf"] for dyns in case_params])
+    f0s = torch.Tensor([dyns["f0"] for dyns in case_params])
+    
+    params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
     return dataloader_train, dataloader_test, params 
 
 def param_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
@@ -166,8 +178,12 @@ def param_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16):
     params = torch.Tensor([ 1e-4, 3e-4, 5e-4, 7e-4]).unsqueeze(-1) 
     return dataloader_train, dataloader_test, params
 
-def init_dataloaders(dataset, batch_size_train, batch_size_val, buffer_filepath=None):
+def init_dataloaders(dataset_name, batch_size_train, batch_size_val, buffer_filepath=None):
     assert buffer_filepath is not None
+
+    # If pendulum, separate the case from the dataset name
+    dataset = dataset_name.split('-')[0]
+
     if dataset == 'pendulum':
         return param_pendulum(buffer_filepath, batch_size_train, batch_size_val)
     elif dataset == 'lv':
@@ -181,35 +197,34 @@ def param_adapt_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25
 
     dataset_train_params = {
         'ndata_per_env': batch_size_train,
-        'time_horizon': 10,
+        'time_horizon': 500,
         'dt': 0.5, 
         'group': 'train',
         'path': buffer_filepath+'_train_ada',
-        'params' : [{"alpha": 0.1, "T0": 4},
-                    {"alpha": 0.1, "T0": 4},
-                    {"alpha": 0.6, "T0": 9},
-                    {"alpha": 0.6, "T0": 9},
-                    ]
+        'params' : params_test
     }
+    
     dataset_test_params = dict()
     dataset_test_params.update(dataset_train_params)
     dataset_test_params['ndata_per_env'] = batch_size_val
     dataset_test_params['group'] = 'test'
     dataset_test_params['path'] = buffer_filepath+'_test_ada'
-    dataset_test_params['time_horizon'] = 20
+    dataset_test_params['time_horizon'] = 500
     
-    dataset_train = DampedPendulum(**dataset_train_params)
-    dataset_test  = DampedPendulum(**dataset_test_params)
+    dataset_train = DampedDrivenPendulum(**dataset_train_params)
+    dataset_test  = DampedDrivenPendulum(**dataset_test_params)
 
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, dataset_train.num_env, is_train=True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train , dataset_train.num_env, is_train=True)
+    dataloader_test  = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
 
     # True parameters
-    T0 = torch.Tensor([4, 4, 9, 9])
-    omegas = (2 * math.pi / T0) ** 2
-    alphas = torch.Tensor([0.1, 0.1, 0.6, 0.6])
-    params = torch.cat((omegas.unsqueeze(-1), alphas.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params     
+    alphas = torch.Tensor([dyns["alpha"] for dyns in params_test])
+    w0s = torch.Tensor([dyns["w0"] for dyns in params_test])
+    wfs = torch.Tensor([dyns["wf"] for dyns in params_test])
+    f0s = torch.Tensor([dyns["f0"] for dyns in params_test])
+    
+    params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
+    return dataloader_train, dataloader_test, params      
 
 def param_adapt_lv(buffer_filepath, batch_size_train=1, batch_size_val=32):
 
@@ -312,8 +327,12 @@ def param_adapt_burgers(buffer_filepath, batch_size_train=4, batch_size_val=32):
     params = torch.Tensor([5e-3, 7e-3, 1e-5, 5e-5]).unsqueeze(-1)
     return dataloader_train, dataloader_test, params
 
-def init_adapt_dataloaders(dataset, batch_size_train = 1, batch_size_val = 32, buffer_filepath=None):
+def init_adapt_dataloaders(dataset_name, batch_size_train = 1, batch_size_val = 32, buffer_filepath=None):
     assert buffer_filepath is not None
+
+    # If pendulum, separate the case from the dataset name
+    dataset = dataset_name.split('-')[0]
+
     if dataset == 'pendulum':
         return param_adapt_pendulum(buffer_filepath, batch_size_train, batch_size_val)
     elif dataset == 'lv':
