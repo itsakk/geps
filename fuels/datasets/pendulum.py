@@ -80,10 +80,11 @@ class DampedDrivenPendulum(Dataset):
         wf = params[env]['wf']
         f0 = params[env]['f0']
         
-        # w02 = w0 ** 2
-        w02 = w0
+        w02 = w0 ** 2
 
-        return w02, alpha, wf, f0
+        IC = params[env]['IC']
+        
+        return w02, alpha, wf, f0, IC
 
     def _f(self, t, x, w02, alpha, wf, f0):  # coords = [q,p]
         q, p = np.split(x, 2)
@@ -91,9 +92,9 @@ class DampedDrivenPendulum(Dataset):
         dpdt = -w02 * np.sin(q) - alpha * p + f0 * np.cos(wf * t)                     
         return np.concatenate([dqdt, dpdt], axis=-1)
 
-    def _get_initial_condition(self, seed):
+    def _get_initial_condition(self, IC, seed):
         np.random.seed(seed if self.group == 'train' else MAX-seed)
-        y0 = np.random.rand(2) #* 2.0 - 1
+        y0 = np.random.rand(2) * IC
         radius = np.random.rand() + 1.3
         y0 = y0 / np.sqrt((y0 ** 2).sum()) * radius
         return y0 
@@ -102,10 +103,10 @@ class DampedDrivenPendulum(Dataset):
     def __getitem__(self, index):
         t_eval = torch.from_numpy(np.arange(0, self.time_horizon, self.dt))
         env = index // self.ndata_per_env
-        w02, alpha, wf, f0 = self._get_pde_parameters(self.params, env)
+        w02, alpha, wf, f0, IC = self._get_pde_parameters(self.params, env)
 
         if self.data.get(str(index)) is None:
-            y0 = self._get_initial_condition(index)
+            y0 = self._get_initial_condition(index,IC)
             states = solve_ivp(fun=self._f, t_span=(0, self.time_horizon), args = (w02, alpha, wf,f0), y0=y0, method='DOP853', t_eval=t_eval, rtol=1e-10).y
             
             self.data[str(index)] = states
