@@ -68,7 +68,9 @@ def param_lv(buffer_filepath, batch_size_train=25, batch_size_val=25):
 
 def param_pendulum(dataset_name, buffer_filepath, batch_size_train=25, batch_size_val=25):
 
-    case = dataset_name.split('-')[1]
+    name = dataset_name.split('-')
+    if len(name)>1: case = name[1]
+    else: case = 'train'
 
     if case == 'ideal':
         case_params = params_ideal
@@ -88,7 +90,7 @@ def param_pendulum(dataset_name, buffer_filepath, batch_size_train=25, batch_siz
         'time_horizon': 500,
         'dt': 0.5, 
         'group': 'train',
-        'path': buffer_filepath+'_train',
+        'path': buffer_filepath + '_train',
         'params' : case_params
     }
     
@@ -180,12 +182,12 @@ def param_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16):
 
 def init_dataloaders(dataset_name, batch_size_train, batch_size_val, buffer_filepath=None):
     assert buffer_filepath is not None
-
+    
     # If pendulum, separate the case from the dataset name
     dataset = dataset_name.split('-')[0]
 
     if dataset == 'pendulum':
-        return param_pendulum(buffer_filepath, batch_size_train, batch_size_val)
+        return param_pendulum(dataset_name, buffer_filepath, batch_size_train, batch_size_val)
     elif dataset == 'lv':
         return param_lv(buffer_filepath, batch_size_train, batch_size_val)
     elif dataset == 'gs':
