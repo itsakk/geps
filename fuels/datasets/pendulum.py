@@ -62,7 +62,7 @@ class DampedPendulum(Dataset):
 
 class DampedDrivenPendulum(Dataset):
 
-    def __init__(self, path, ndata_per_env, time_horizon, dt, params, group='train'):
+    def __init__(self, path, ndata_per_env, time_horizon, dt, params, IC, group='train'):
         super().__init__()
         self.time_horizon = float(time_horizon)  # total time
         self.dt = float(dt)  # time step
@@ -73,6 +73,7 @@ class DampedDrivenPendulum(Dataset):
         self.data = shelve.open(path)
         self.params = params
         self.indices = [list(range(env * ndata_per_env, (env + 1) * ndata_per_env)) for env in range(self.num_env)]
+        self.IC = IC
 
     def _get_pde_parameters(self, params, env):
         alpha = params[env]['alpha']
@@ -81,10 +82,8 @@ class DampedDrivenPendulum(Dataset):
         f0 = params[env]['f0']
         
         w02 = w0 ** 2
-
-        IC = params[env]['IC']
         
-        return w02, alpha, wf, f0, IC
+        return w02, alpha, wf, f0
 
     def _f(self, t, x, w02, alpha, wf, f0):  # coords = [q,p]
         q, p = np.split(x, 2)
@@ -92,21 +91,21 @@ class DampedDrivenPendulum(Dataset):
         dpdt = -w02 * np.sin(q) - alpha * p + f0 * np.cos(wf * t)                     
         return np.concatenate([dqdt, dpdt], axis=-1)
 
-    def _get_initial_condition(self, IC, seed):
+    def _get_initial_condition(self, seed):
         np.random.seed(seed if self.group == 'train' else MAX-seed)
-        y0 = np.random.rand(2) * IC
-        radius = np.random.rand() + 1.3
-        y0 = y0 / np.sqrt((y0 ** 2).sum()) * radius
+        y0 = np.random.rand(2) * self.IC
+        # radius = np.random.rand() + 1.3
+        # y0 = y0 / np.sqrt((y0 ** 2).sum()) * radius
         return y0 
         # return np.array([0.1,0])
 
     def __getitem__(self, index):
         t_eval = torch.from_numpy(np.arange(0, self.time_horizon, self.dt))
         env = index // self.ndata_per_env
-        w02, alpha, wf, f0, IC = self._get_pde_parameters(self.params, env)
+        w02, alpha, wf, f0 = self._get_pde_parameters(self.params, env)
 
         if self.data.get(str(index)) is None:
-            y0 = self._get_initial_condition(index,IC)
+            y0 = self._get_initial_condition(index)
             states = solve_ivp(fun=self._f, t_span=(0, self.time_horizon), args = (w02, alpha, wf,f0), y0=y0, method='DOP853', t_eval=t_eval, rtol=1e-10).y
             
             self.data[str(index)] = states

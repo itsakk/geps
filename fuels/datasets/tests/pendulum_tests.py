@@ -48,12 +48,12 @@ if __name__ == '__main__':
 
         for name in dataset_names:
                 
-                dataloader_train, dataloader_test, params = init_dataloaders(dataset_name=name,
+                dataloader_train, dataloader_test, params = init_dataloaders(dataset=name,
                                                                              buffer_filepath= os.path.join(path, name), 
                                                                              batch_size_train=1, 
                                                                              batch_size_val=1)
                 
-                dataloader_train_ada, dataloader_test_ada, params = init_adapt_dataloaders(dataset_name=name,
+                dataloader_train_ada, dataloader_test_ada, params = init_adapt_dataloaders(dataset=name,
                                                                              buffer_filepath= os.path.join(path, name), 
                                                                              batch_size_train=1, 
                                                                              batch_size_val=1)
@@ -70,13 +70,13 @@ if __name__ == '__main__':
 
                     for j, tr in enumerate(data['states']):
 
-                            ax[j].plot(tr[0,:].numpy())
+                            ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
                             ax[j].set_title(r"$\omega^2_0 = {:.2f}, $".format(data["w02"][j]) + 
                                             r" $\alpha = {:.2f}, $".format(data["alpha"][j])  +
                                             r" $\omega_f = {:.2f}, $".format(data["wf"][j])   +
                                             r" $f_0 = {:.2f}$".format(data["f0"][j]), fontsize = 25)
-                            ax[j].set_xlabel('Time')
-                            ax[j].set_ylabel('Position')
+                            ax[j].set_xlabel(r"t", fontsize = 25)
+                            ax[j].set_ylabel(r"$\theta (t)$", fontsize = 25)
 
                             
                     
@@ -96,13 +96,13 @@ if __name__ == '__main__':
 
                     for j, tr in enumerate(data2['states']):
 
-                            ax[j].plot(tr[0,:].numpy())
+                            ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
                             ax[j].set_title(r"$\omega^2_0 = {:.2f}, $".format(data2["w02"][j]) + 
                                             r" $\alpha = {:.2f}, $".format(data2["alpha"][j])  +
                                             r" $\omega_f = {:.2f}, $".format(data2["wf"][j])   +
                                             r" $f_0 = {:.2f}$".format(data2["f0"][j]), fontsize = 25)
-                            ax[j].set_xlabel('Time')
-                            ax[j].set_ylabel('Position')
+                            ax[j].set_xlabel(r"t", fontsize = 25)
+                            ax[j].set_ylabel(r"$\theta (t)$", fontsize = 25)
 
                             
                     
