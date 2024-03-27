@@ -93,7 +93,7 @@ class DampedDrivenPendulum(Dataset):
 
     def _get_initial_condition(self, seed):
         np.random.seed(seed if self.group == 'train' else MAX-seed)
-        y0 = np.random.rand(2) * 2.0 - 1
+        y0 = np.random.rand(2) #* 2.0 - 1
         radius = np.random.rand() + 1.3
         y0 = y0 / np.sqrt((y0 ** 2).sum()) * radius
         return y0 
@@ -113,7 +113,7 @@ class DampedDrivenPendulum(Dataset):
         else:
             states = torch.from_numpy(self.data[str(index)]).float()
 
-        return {'states': states, 't': t_eval.float(),'env': env, 'index' : index, 'w02' : w02, 'alpha' : alpha, 'wf' : wf}
+        return {'states': states, 't': t_eval.float(),'env': env, 'index' : index, 'w02' : w02, 'alpha' : alpha, 'wf' : wf, 'f0' : f0}
 
     def __len__(self):
         return self.len
