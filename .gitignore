@@ -6,3 +6,4 @@
 *.err
 *.out
 *.ipynb
+*_cases.py
