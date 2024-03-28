@@ -59,18 +59,21 @@ if __name__ == '__main__':
                                                                              batch_size_val=1)
                 
                 
-                for data in dataloader_train:
+                # for data in dataloader_train:
+                for data in dataloader_test:
                 
                     trjs = data['states'].shape[0]
 
                     fig, ax = plt.subplots(trjs, 1, figsize=(15,8*trjs) )
-                    fig.suptitle('Train',fontsize=50)
+                    # fig.suptitle('Train',fontsize=50)
+                    fig.suptitle('Test',fontsize=50)
                     fig.subplots_adjust(top=0.95)
 
 
                     for j, tr in enumerate(data['states']):
 
-                            ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
+                            # ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
+                            ax[j].plot(np.arange(0,400,0.5),tr[0,:].numpy())
                             ax[j].set_title(r"$\omega^2_0 = {:.2f}, $".format(data["w02"][j]) + 
                                             r" $\alpha = {:.2f}, $".format(data["alpha"][j])  +
                                             r" $\omega_f = {:.2f}, $".format(data["wf"][j])   +
@@ -80,23 +83,25 @@ if __name__ == '__main__':
 
                             
                     
-                    fig.savefig(os.path.join(path,'Images/'+ name +'_train.png'))
+                    fig.savefig(os.path.join(path,'Images/'+ name +'_test.png'))
 
 
 
 
-                for data2 in dataloader_train_ada:
+                # for data2 in dataloader_train_ada:
+                for data2 in dataloader_test_ada:    
                 
                     trjs = data2['states'].shape[0]
 
                     fig, ax = plt.subplots(trjs, 1, figsize=(15,7*trjs) )
-                    fig.suptitle('Train adapt',fontsize=50)
+                    fig.suptitle('Test adapt',fontsize=50)
                     fig.subplots_adjust(top=0.9)
 
 
                     for j, tr in enumerate(data2['states']):
 
-                            ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
+                            # ax[j].plot(np.arange(0,200,0.5),tr[0,:].numpy())
+                            ax[j].plot(np.arange(0,400,0.5),tr[0,:].numpy())
                             ax[j].set_title(r"$\omega^2_0 = {:.2f}, $".format(data2["w02"][j]) + 
                                             r" $\alpha = {:.2f}, $".format(data2["alpha"][j])  +
                                             r" $\omega_f = {:.2f}, $".format(data2["wf"][j])   +
@@ -106,4 +111,4 @@ if __name__ == '__main__':
 
                             
                     
-                    fig.savefig(os.path.join(path,'Images/'+ name +'_train_ada.png'))
+                    fig.savefig(os.path.join(path,'Images/'+ name +'_test_ada.png'))
