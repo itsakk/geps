@@ -9,7 +9,6 @@ import numpy as np
 
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
-from torch.nn import init
 
 from fuels.utils import fix_seed, count_parameters, init_weights
 from fuels.datasets import *
