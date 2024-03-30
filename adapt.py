@@ -73,7 +73,14 @@ def main(cfg: DictConfig) -> None:
         dir=run_dir,
         resume='allow',
     )
-    
+
+    run.tags = (
+            ("fuels",)
+            + (dataset_name,)
+            + (type_augment)
+            + ("adapt")
+    )
+
     run_name = wandb.run.name
     wandb.config.update(
         OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
@@ -102,6 +109,8 @@ def main(cfg: DictConfig) -> None:
     model_dict = model.state_dict()
     pretrained_dict = {k: v for k, v in checkpoint['model'].items() if (k in model_dict and not "codes" in k)}
     pretrained_dict['derivative.model_phy.params'] = pretrained_dict['derivative.model_phy.params'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2)
+    pretrained_dict['derivative.model_aug.codes'] = pretrained_dict['derivative.model_aug.codes'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2)
+
 
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
@@ -133,6 +142,7 @@ def main(cfg: DictConfig) -> None:
     t_in = train.dataset[0]['t'].shape[-1]
     nupdate = 100
     criterion = nn.MSELoss()
+    criterion_eval = RelativeL2()
 
     print("ntrain, ntest : ", ntrain, ntest)
     print("t_in : ", t_in)
@@ -176,8 +186,8 @@ def main(cfg: DictConfig) -> None:
                     env = data_test['env'].to(device)
 
                     outputs_test = model(targets_test[..., 0], t, env)
-                    loss_in = criterion(outputs_test[..., :t_in], targets_test[..., :t_in])
-                    loss_out = criterion(outputs_test[..., t_in:], targets_test[..., t_in:])
+                    loss_in = criterion_eval(outputs_test[..., :t_in], targets_test[..., :t_in])
+                    loss_out = criterion_eval(outputs_test[..., t_in:], targets_test[..., t_in:])
                     loss_test_in += loss_in.item() * n_samples
                     loss_test_out += loss_out.item() * n_samples
 

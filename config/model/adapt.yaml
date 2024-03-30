@@ -24,7 +24,6 @@ model:
   code_c: 2
   method: 'rk4'
   factor: 1
-  pde_params: False
   is_complete: False
   type_augment: "serie"
   options:
@@ -34,7 +33,7 @@ pretrain:
   
 wandb:
   entity: "spatiotemp-isir"
-  project: "pdegen"
+  project: "fuels"
   name: 
   id: 
   dir:

@@ -31,7 +31,7 @@ model:
 
 wandb:
   entity: "spatiotemp-isir"
-  project: "pdegen"
+  project: "fuels"
   name: 
   id: 
   dir:

@@ -49,8 +49,8 @@ def main(cfg: DictConfig) -> None:
     method = cfg.model.method
     options = cfg.model.options
 
-    if dataset_name == 'gs':
-        options = dict(step_size = 1)
+    # if dataset_name == 'gs':
+    #     options = dict(step_size = 1)
 
     # device
     device = torch.device("cuda")
@@ -72,7 +72,14 @@ def main(cfg: DictConfig) -> None:
         dir=run_dir,
         resume='allow',
     )
-    
+
+    run.tags = (
+            ("fuels",)
+            + (dataset_name,)
+            + (type_augment,)
+            + ("train",)
+    )
+
     run_name = wandb.run.name
     wandb.config.update(
         OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
@@ -115,6 +122,7 @@ def main(cfg: DictConfig) -> None:
     criterion = nn.MSELoss()
     criterion_eval = RelativeL2()
     l2_loss = 0
+    param_error = 0
 
     print("ntrain, ntest : ", ntrain, ntest)
     print("t_in : ", t_in)
@@ -124,6 +132,7 @@ def main(cfg: DictConfig) -> None:
     print("num_env : ", num_env)
     print(f"n_params forecaster: {count_parameters(model)}")
     print("params : ", params)
+    t_in = 20
 
     for epoch in range(epochs):
         step_show = epoch % nupdate == 0
@@ -131,10 +140,9 @@ def main(cfg: DictConfig) -> None:
         loss_train = 0
 
         for _, data in enumerate(train):
-            targets = data["states"].to(device)
-
+            targets = data["states"][..., :t_in].to(device)
             n_samples = len(targets)
-            t = data["t"][0].to(device)
+            t = data["t"][0][:t_in].to(device)
             env = data["env"].to(device)
 
             y0 = targets[..., 0]
@@ -143,6 +151,7 @@ def main(cfg: DictConfig) -> None:
             
             if regul:
                 l2_loss = l2_penalty(model)
+
             loss_total = loss + l2_loss
             loss_total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.)
@@ -159,9 +168,9 @@ def main(cfg: DictConfig) -> None:
                 loss_test_in = 0
                 loss_test_out = 0
                 for _, data_test in enumerate(test):
-                    targets_test = data_test['states'].to(device)
+                    targets_test = data_test['states'][..., :(t_in * 2)].to(device)
                     n_samples = len(targets_test)
-                    t = data_test['t'][0].to(device)
+                    t = data_test['t'][0][:(t_in * 2)].to(device)
                     env = data_test['env'].to(device)
 
                     outputs_test = model(targets_test[..., 0], t, env)
@@ -170,8 +179,10 @@ def main(cfg: DictConfig) -> None:
                     loss_out = criterion_eval(outputs_test[..., t_in:], targets_test[..., t_in:])
                     loss_test_in += loss_in.item() * n_samples
                     loss_test_out += loss_out.item() * n_samples
-            print("model.derivative.model_phy.estimated_params : ", model.derivative.model_phy.estimated_params)
-            param_error = torch.mean(abs((model.derivative.model_phy.estimated_params - params) / params)) * 100
+
+            # if type_augment != '':
+            #     param_error = torch.mean(abs((model.derivative.model_phy.estimated_params - params) / params)) * 100
+
             loss_test_in /= ntest
             loss_test_out /= ntest
 

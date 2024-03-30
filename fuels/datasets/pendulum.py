@@ -42,10 +42,11 @@ class DampedPendulum(Dataset):
     def __getitem__(self, index):
         t_eval = torch.from_numpy(np.arange(0, self.time_horizon, self.dt))
         env = index // self.ndata_per_env
+        env_index = index % self.ndata_per_env
         omega0_square, alpha = self._get_pde_parameters(self.params, env)
 
         if self.data.get(str(index)) is None:
-            y0 = self._get_initial_condition(index)
+            y0 = self._get_initial_condition(env_index)
             states = solve_ivp(fun=self._f, t_span=(0, self.time_horizon), args = (omega0_square, alpha), y0=y0, method='DOP853', t_eval=t_eval, rtol=1e-10).y
             self.data[str(index)] = states
             states = torch.from_numpy(states).float()
@@ -56,10 +57,6 @@ class DampedPendulum(Dataset):
 
     def __len__(self):
         return self.len
-    
-
-
-
 class DampedDrivenPendulum(Dataset):
 
     def __init__(self, path, ndata_per_env, time_horizon, dt, params, IC, group='train'):

@@ -28,7 +28,7 @@ class MLP(nn.Module):
         x1 = self.act3(x1, codes)
         x1 = self.linear4(x1, diag_codes)
         return x1
-
+    
 class CNN1D(nn.Module):
 
     def __init__(self, in_dim, out_dim, kernel_size, factor, codes):
@@ -92,5 +92,7 @@ def get_nn_model(dataset_name, in_dim, out_dim, factor, codes):
     elif dataset_name == 'burgers':
         model = CNN1D(in_dim, out_dim, 7, factor, codes)
     elif dataset_name == 'gs':
+        model = CNN2D(in_dim, out_dim, 3, factor, codes)
+    elif dataset_name == 'kolmo':
         model = CNN2D(in_dim, out_dim, 3, factor, codes)
     return model

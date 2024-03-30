@@ -23,9 +23,8 @@ hidden_c=64
 state_c=2 # 2 others, 1 if burgers
 code_c=2
 is_complete=complete
-pde_params=False
 type_augment=serie
 factor=1 # 1 if lv or pendulum, 0.0005 if gs
 run_name='summer-morning-1754'
 
-python3 adapt.py "data.dataset_name=$dataset_name" "optim.batch_size_train=$batch_size_train" "optim.batch_size_val=$batch_size_val" "data.seed=$seed" "optim.epochs=$epochs" "optim.lr=$lr"  "model.hidden_c=$hidden_c" "model.state_c=$state_c" "model.code_c=$code_c" "pretrain.run_name=$run_name" "model.factor=$factor" "model.is_complete=$is_complete" "model.pde_params=$pde_params" "model.type_augment=$type_augment"
+python3 adapt.py "data.dataset_name=$dataset_name" "optim.batch_size_train=$batch_size_train" "optim.batch_size_val=$batch_size_val" "data.seed=$seed" "optim.epochs=$epochs" "optim.lr=$lr"  "model.hidden_c=$hidden_c" "model.state_c=$state_c" "model.code_c=$code_c" "pretrain.run_name=$run_name" "model.factor=$factor" "model.is_complete=$is_complete" "model.type_augment=$type_augment"

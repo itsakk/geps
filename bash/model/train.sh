@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=fuels
-#SBATCH --partition=jazzy
+#SBATCH --partition=hard
+#SBATCH --constraint="GPUM48G"
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
 #SBATCH --time=10000
@@ -13,18 +14,18 @@ set -x
 conda init bash
 conda activate fuels
 
-dataset_name='lv' # pendulum, burgers, gs, lv
-batch_size_train=4 # 4 if lv, 16 if pendulum, 1 if gs, 4 if burgers
-batch_size_val=32
+dataset_name='kolmo' # pendulum, burgers, gs, lv
+batch_size_train=1 # 4 if lv, 16 if pendulum, 1 if gs, 4 if burgers
+batch_size_val=1
 epochs=20000
 lr=0.001
 seed=123
 hidden_c=64
-state_c=2 # 2 others, 1 if burgers
+state_c=1 # 2 others, 1 if burgers-kolmo
 code_c=2
 init_type={'A':{'type':'orthogonal','gain':1},'B':{'type':'orthogonal','gain':1},'weight':{'type':'orthogonal','gain':1}}
 is_complete=False
-type_augment='serie'
+type_augment=''
 regul=False
 factor=1 
 

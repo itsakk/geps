@@ -8,11 +8,11 @@ class DampedPendulumParamPDE(nn.Module):
     def __init__(self, is_complete = False, code = 2):
         super().__init__()
         self.params = nn.Parameter(torch.cat((torch.full((1, 1), 0.2), torch.full((1, 1), 0.1)), axis = 1))
-        self.weight = nn.Parameter(torch.empty((2, code)))
+        self.weight = nn.Parameter(torch.empty(( 2, code)))
         self.is_complete = is_complete
 
     def forward(self, t, y0, env, codes):
-        self.estimated_params = self.params + F.linear(codes, self.weight)
+        self.estimated_params = self.params + F.linear(codes, self.weight) # codes = [num_env, code_dim], params = [1, 2], weight = [2, code_dim] => estimated_params = [num_env, 2]
             
         q = y0[:,0:1]
         p = y0[:,1:2]
@@ -153,6 +153,73 @@ class GrayScottParamPDE(nn.Module):
             dVdt = r_v * Delta_v + U * (V ** 2)
         return torch.cat([dUdt, dVdt], dim=1)
     
+class Turb2dPDE(nn.Module):
+
+    def __init__(self, code):
+        super().__init__()
+        self.params = nn.Parameter(torch.cat((torch.full((1, 1), 5e-3), torch.full((1, 1), 1)), axis = 1))
+        self.weight = nn.Parameter(torch.empty((2, code)))
+        self.N = 512
+        self.dx = np.pi / self.N
+
+    def derive_x(self,a):
+        return(
+            torch.roll(a,-1,dims=2)
+            -torch.roll(a,+1,dims=2)
+        )
+
+    def derive_y(self,a):
+        return(
+            torch.roll(a,-1,dims=1)
+            -torch.roll(a,+1,dims=1)
+            )
+    
+    def laplacian2D(self,a, fdx):
+        return (
+            - 4 * a
+            + torch.roll(a,+1,dims=1) 
+            + torch.roll(a,-1,dims=1)
+            + torch.roll(a,+1,dims=2)
+            + torch.roll(a,-1,dims=2)
+            ) / (fdx ** 2)
+    
+    def ps(self, N, fdx, w):
+        w_pad = F.pad(w,pad=(0,1,0,1),mode="circular")
+        wf = torch.fft.fft2(1/N**2*w_pad)
+
+        with torch.no_grad():
+            kxx, kyy = torch.meshgrid(2*np.pi*torch.fft.fftfreq(self.N+1, fdx, device="cuda"), 2*np.pi*torch.fft.fftfreq(self.N+1, fdx, device="cuda"))
+            uf = -wf/(1e-12 + kxx**2 + kyy**2)
+            uf[0,0] = 0
+        return (torch.fft.ifft2(N**2*uf).real)[...,:self.N,:self.N]
+    
+    def f2(self, x, mu, fdx):
+        mu = mu
+        psi = self.ps(self.N, fdx,-x)
+
+        J1 =  (self.derive_y(psi)*self.derive_x(x) -self.derive_x(psi)*self.derive_y(x)) / (4* fdx**2)
+
+        J2 = (torch.roll(x,-1,dims=2)*(self.derive_y(torch.roll(psi,-1,dims=2))) \
+            - torch.roll(x,+1,dims=2)*(self.derive_y(torch.roll(psi,+1,dims=2))) \
+            - torch.roll(x,-1,dims=1)*(self.derive_x(torch.roll(psi,-1,dims=1))) \
+            + torch.roll(x,+1,dims=1)*(self.derive_x(torch.roll(psi,+1,dims=1)))) / (4* fdx**2)
+        
+        J3 = (torch.roll(torch.roll(x,-1,dims=2),-1,dims=1)*(torch.roll(psi,-1,dims=1)-torch.roll(psi,-1,dims=2))\
+            -torch.roll(torch.roll(x,+1,dims=2),+1,dims=1)*(torch.roll(psi,+1,dims=2)-torch.roll(psi,+1,dims=1))\
+            -torch.roll(torch.roll(x,+1,dims=2),-1,dims=1)*(torch.roll(psi,-1,dims=1)-torch.roll(psi,+1,dims=2))\
+            +torch.roll(torch.roll(x,-1,dims=2),+1,dims=1)*(torch.roll(psi,-1,dims=2)-torch.roll(psi,+1,dims=1))) / (4* fdx**2)
+
+        return (-(J1+J2+J3)/3 + mu*self.laplacian2D(x, fdx))
+        
+    def forward(self, t, y0, env, codes):
+        self.estimated_params = self.params + F.linear(codes, self.weight)
+        params = self.estimated_params[env.long(), :]
+        mu, domain = params[:, 0:1], params[:, 1:2]
+        fdx = domain * self.dx
+        dudt = self.f2(y0[:, 0], mu, fdx)
+        print("dudt.shape : ", dudt.shape)
+        return dudt
+        
 def get_numerical_solver(dataset_name, code_c, is_complete):
     if dataset_name == 'pendulum':
         model_phy = DampedPendulumParamPDE(is_complete=is_complete, code = code_c)
@@ -162,4 +229,6 @@ def get_numerical_solver(dataset_name, code_c, is_complete):
         model_phy = GrayScottParamPDE(is_complete=is_complete, code = code_c)
     elif dataset_name == 'burgers':
         model_phy = BurgersParamPDE(code = code_c)
+    elif dataset_name == 'kolmo':
+        model_phy = Turb2dPDE(code = code_c)
     return model_phy
