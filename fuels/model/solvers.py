@@ -159,7 +159,7 @@ class Turb2dPDE(nn.Module):
         super().__init__()
         self.params = nn.Parameter(torch.cat((torch.full((1, 1), 5e-3), torch.full((1, 1), 1)), axis = 1))
         self.weight = nn.Parameter(torch.empty((2, code)))
-        self.N = 512
+        self.N = 256
         self.dx = np.pi / self.N
 
     def derive_x(self,a):
@@ -187,15 +187,25 @@ class Turb2dPDE(nn.Module):
         w_pad = F.pad(w,pad=(0,1,0,1),mode="circular")
         wf = torch.fft.fft2(1/N**2*w_pad)
 
-        with torch.no_grad():
-            kxx, kyy = torch.meshgrid(2*np.pi*torch.fft.fftfreq(self.N+1, fdx, device="cuda"), 2*np.pi*torch.fft.fftfreq(self.N+1, fdx, device="cuda"))
-            uf = -wf/(1e-12 + kxx**2 + kyy**2)
-            uf[0,0] = 0
+        # with torch.no_grad():
+        kxxs, kyys = [], []
+        for dx in fdx[:, 0]:
+            kxx, kyy = torch.meshgrid(2*np.pi*torch.fft.fftfreq(self.N+1, dx.item(), device="cuda"), 2*np.pi*torch.fft.fftfreq(self.N+1, dx.item(), device="cuda"))
+            kxxs.append(kxx.unsqueeze(0))
+            kyys.append(kyy.unsqueeze(0))
+        kxxs = torch.stack(kxxs, dim = 0)
+        kyys = torch.stack(kyys, dim = 0)
+
+        uf = -wf/(1e-12 + kxxs**2 + kyys**2)
+        uf[:, 0, 0] = 0
         return (torch.fft.ifft2(N**2*uf).real)[...,:self.N,:self.N]
     
-    def f2(self, x, mu, fdx):
-        mu = mu
-        psi = self.ps(self.N, fdx,-x)
+    def f2(self, x, env, codes):
+        self.estimated_params = self.params + F.linear(codes, self.weight)
+        params = self.estimated_params[env.long(), :]
+        mu, domain = params[:, 0:1], params[:, 1:2]
+        fdx = domain * self.dx
+        psi = self.ps(self.N, fdx, -x)
 
         J1 =  (self.derive_y(psi)*self.derive_x(x) -self.derive_x(psi)*self.derive_y(x)) / (4* fdx**2)
 
@@ -212,12 +222,7 @@ class Turb2dPDE(nn.Module):
         return (-(J1+J2+J3)/3 + mu*self.laplacian2D(x, fdx))
         
     def forward(self, t, y0, env, codes):
-        self.estimated_params = self.params + F.linear(codes, self.weight)
-        params = self.estimated_params[env.long(), :]
-        mu, domain = params[:, 0:1], params[:, 1:2]
-        fdx = domain * self.dx
-        dudt = self.f2(y0[:, 0], mu, fdx)
-        print("dudt.shape : ", dudt.shape)
+        dudt = self.f2(y0[:, 0], env, codes)
         return dudt
         
 def get_numerical_solver(dataset_name, code_c, is_complete):
