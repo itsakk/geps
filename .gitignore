@@ -6,9 +6,6 @@
 *.err
 *.out
 *.ipynb
-<<<<<<< Updated upstream
 *_cases.py
-=======
 outputs/
 fuels.egg-info/
->>>>>>> Stashed changes
