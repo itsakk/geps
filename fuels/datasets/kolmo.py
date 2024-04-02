@@ -173,7 +173,7 @@ class Turb2d(Dataset):
             states = einops.rearrange(states, "t n m -> n m t").cpu().detach().unsqueeze(0)
             self.data[str(index)] = states
         else:
-            states = torch.tensor(self.data[str(index)])
+            states = self.data[str(index)]
         return {'states': states, 't': torch.arange(0, self.time_horizon, self.dt_filt).float(), 'env': env}
 
     def __len__(self):

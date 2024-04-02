@@ -50,7 +50,7 @@ def main(cfg: DictConfig) -> None:
 
     # if dataset_name == 'gs':
     #     options = dict(step_size = 1)
-
+    
     # device
     device = torch.device("cuda")
 
@@ -160,7 +160,7 @@ def main(cfg: DictConfig) -> None:
 
         loss_train /= ntrain
         scheduler.step(loss_train)
-        
+     
         if True in (step_show, step_show_last):
             with torch.no_grad():
                 loss_test_in = 0

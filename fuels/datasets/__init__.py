@@ -11,7 +11,8 @@ def DataLoaderODE(dataset, minibatch_size, shuffle=True):
         'dataset': dataset,
         'batch_size': minibatch_size,
         'num_workers': 1,
-        'pin_memory': shuffle,
+        'shuffle': shuffle,
+        'pin_memory': True,
         'drop_last': False
     }
     return DataLoader(**dataloader_params)
@@ -198,8 +199,8 @@ def param_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):
     dataset_test_params['t_horizon'] = 2.4
 
     dataset_train, dataset_test = Turb2d(**dataset_train_params), Turb2d(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, dataset_train.num_env, is_train=True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = True)
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle = False)
 
     nu = torch.Tensor([1e-3, 1e-3, 1e-3, 1e-3, 1e-4, 1e-4, 1e-4, 1e-4])
     domain = torch.Tensor([0.75, 1.0, 0.75, 1.0, 0.75, 1.0, 0.75, 1.0])
@@ -388,8 +389,8 @@ def param_adapt_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):
     dataset_test_params['t_horizon'] = 2.4
 
     dataset_train, dataset_test = Turb2d(**dataset_train_params), Turb2d(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, dataset_train.num_env, is_train=True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, dataset_train.num_env, is_train=False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = True)
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle = False)
 
     nu = torch.Tensor([1e-5, 1e-5, 1e-5, 1e-5])
     domain = torch.Tensor([1.5, 2.0, 1.5, 2.0])
