@@ -5,14 +5,13 @@ from fuels.datasets.lv import LotkaVolterraDataset
 from fuels.datasets.gs import GrayScottDataset
 from fuels.datasets.burgers import Burgers
 from fuels.datasets.kolmo import Turb2d
-from fuels.utils import SubsetRamdomSampler, SubsetSequentialSampler
 
 def DataLoaderODE(dataset, minibatch_size, shuffle=True):
     dataloader_params = {
         'dataset': dataset,
         'batch_size': minibatch_size,
         'num_workers': 0,
-        'shuffle': shuffle,
+        'shuffle': False,
         'pin_memory': True,
         'drop_last': False
     }
@@ -91,18 +90,17 @@ def param_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
     
     dataset_train = DampedDrivenPendulum(**dataset_train_params)
     dataset_test  = DampedDrivenPendulum(**dataset_test_params)
-
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = True)
-    dataloader_test  = DataLoaderODE(dataset_test, batch_size_val, shuffle = False)
+    
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True)
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
 
     # True parameters
     alphas = torch.Tensor([vals["alpha"] for vals in dataset_train_params["params"]])
     w0s = torch.Tensor([vals["w0"] for vals in dataset_train_params["params"]])
     wfs = torch.Tensor([vals["wf"] for vals in dataset_train_params["params"]])
     f0s = torch.Tensor([vals["f0"] for vals in dataset_train_params["params"]])
-    
     params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params
+    return dataloader_train, dataloader_test, params 
 
 def param_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
     dataset_train_params = {
@@ -260,7 +258,7 @@ def param_adapt_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25
     f0s = torch.Tensor([vals["f0"] for vals in dataset_train_params["params"]])
     
     params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params      
+    return dataloader_train, dataloader_test, params   
 
 def param_adapt_lv(buffer_filepath, batch_size_train=1, batch_size_val=32):
 
@@ -344,10 +342,10 @@ def param_adapt_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16)
         "group": "train",
         'path': buffer_filepath + '_train_ada',
         "params": [
-            {"mu": 1.0, 'force': 'exp', 'F': 5, 'w': 1.5, "domain": 2},
-            {"mu": 5e-5, 'force': 'exp', 'F': 5, 'w': 1.5, "domain": 2},
-            {"mu": 1.0, 'force': 'exp', 'F': 5, 'w': 3.0, "domain": 2},
-            {"mu": 5e-5, 'force': 'exp', 'F': 5, 'w': 3.0, "domain": 2},
+            {"mu": 3e-1, 'force': 'rand', 'F': 5, 'w': 2, "domain": 2},
+            {"mu": 5e-5, 'force': 'rand', 'F': 5, 'w': 2, "domain": 2},
+            {"mu": 3e-1, 'force': 'exp', 'F': 5, 'w': 2, "domain": 2},
+            {"mu": 5e-5, 'force': 'exp', 'F': 5, 'w': 2, "domain": 2},
         ],
     }
 
@@ -359,10 +357,10 @@ def param_adapt_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16)
     dataset_test_params['t_horizon'] = 0.1
 
     dataset_train, dataset_test = Burgers(**dataset_train_params), Burgers(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle  = True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle  = False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True) #  // len(dataset_train_params['params'])
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False) # // len(dataset_train_params['params'])
 
-    params = torch.Tensor([1.0, 5e-5, 1.0, 5e-5]).unsqueeze(-1) 
+    params = torch.Tensor([3e-1, 5e-1, 3e-1, 5e-5]).unsqueeze(-1) 
     return dataloader_train, dataloader_test, params
 
 def param_adapt_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):

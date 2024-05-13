@@ -174,7 +174,7 @@ class Turb2d(Dataset):
             self.data[str(index)] = states
         else:
             states = self.data[str(index)]
-        return {'states': states, 't': torch.arange(0, self.time_horizon, self.dt_filt).float(), 'env': env}
+        return {'states': states, 't': torch.arange(0, self.time_horizon - self.warmup * self.dt_filt, self.dt_filt).float(), 'env': env}
 
     def __len__(self):
         return int(self.len)

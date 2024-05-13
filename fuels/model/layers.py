@@ -183,23 +183,101 @@ class ROCALinear(nn.Module):
         combined_weight = self.weight + self.factor * context_weights
         combined_bias = self.bias + self.factor * context_bias
         return torch.bmm(input.unsqueeze(1), combined_weight).squeeze(1) + combined_bias
+class ROCALinear1D(nn.Module):
 
-class Swish(nn.Module):
-
-    def __init__(self, code, factor):
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, 
+                 code: int = 2, factor: int = 1, device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__()
+        
         self.factor = factor
-        self.agnostic_beta = nn.Parameter(torch.tensor([0.5]))
-        self.weight = nn.Parameter(torch.empty(1, code))
+        self.code = code
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = nn.Parameter(torch.empty((in_features, out_features), **factory_kwargs))
+        self.A = nn.Parameter(torch.empty((in_features, code), **factory_kwargs))
+        self.B = nn.Parameter(torch.empty((code, out_features), **factory_kwargs))
+
+        if bias:
+            self.bias = nn.Parameter(torch.empty((out_features), **factory_kwargs))
+            self.bias_context = nn.Parameter(torch.empty((code, out_features), **factory_kwargs))
+        else:
+            self.register_parameter('bias', None)
+            self.register_parameter('bias_context', None)
+        self.reset_parameters()
 
     def reset_parameters(self) -> None:
         bound = 1 / math.sqrt(self.in_features)
         nn.init.uniform_(self.weight, -bound, bound)
+        nn.init.uniform_(self.A, -bound, bound)
+        nn.init.uniform_(self.B, -bound, bound)
+        nn.init.uniform_(self.bias, -bound, bound)
+        nn.init.uniform_(self.bias_context, -bound, bound)
+
+    def forward(self, input: torch.Tensor, codes: torch.Tensor) -> torch.Tensor:
+        weights = torch.einsum("ir,  brp-> bip", self.A, codes)
+        context_weights = torch.einsum("bir, rj -> bij", weights, self.B)
+        context_bias = torch.matmul(torch.diagonal(codes, dim1=-2, dim2=-1), self.bias_context).view(-1, self.out_features)
+        combined_weight = self.weight + self.factor * context_weights
+        combined_bias = self.bias + self.factor * context_bias
+        return torch.bmm(input, combined_weight) + combined_bias.unsqueeze(1)
+
+class ROCASpectralConv2d_fast(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, modes2, code, factor = 1):
+        super(ROCASpectralConv2d_fast, self).__init__()
+
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        """
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        # Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes1 = modes1
+        self.modes2 = modes2
+        self.factor = factor
+
+        self.scale = (1 / (in_channels * out_channels))
+        self.weights1 = nn.Parameter(
+            self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+        self.weights2 = nn.Parameter(
+            self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
+        
+        self.A_1 = nn.Parameter(torch.empty((in_channels, code, self.modes1, self.modes2)))
+        self.B_1 = nn.Parameter(torch.empty((code, out_channels, self.modes1, self.modes2)))
+        self.A_2 = nn.Parameter(torch.empty((in_channels, code, self.modes1, self.modes2)))
+        self.B_2 = nn.Parameter(torch.empty((code, out_channels, self.modes1, self.modes2)))
+
+    # Complex multiplication
+    def compl_mul2d(self, input, weights):
+        # (batch, in_channel, x,y ), (batch, in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
+        return torch.einsum("bixy,bioxy->boxy", input, weights)
 
     def forward(self, x, codes):
-        softplus = F.softplus(self.agnostic_beta + self.factor * F.linear(codes, self.weight))
-        if len(x.shape) == 3:
-            softplus = softplus[..., None]
-        if len(x.shape) == 4:
-            softplus = softplus[..., None, None]
-        return (x * torch.sigmoid_(x * softplus)).div_(1.1)
+        batchsize = x.shape[0]
+        # Compute Fourier coeffcients up to factor of e^(- something constant)
+        x_ft = torch.fft.rfft2(x)
+
+        weights_1 = torch.einsum("icmn,  bcr-> birmn", self.A_1, codes)
+        context_weights_1 = torch.einsum("birmn, romn -> biomn", weights_1, self.B_1)
+        weights1 = self.weights1 + self.factor * context_weights_1
+
+        weights_2 = torch.einsum("icmn,  bcr-> birmn", self.A_2, codes)
+        context_weights_2 = torch.einsum("birmn, romn -> biomn", weights_2, self.B_2)
+        weights2 = self.weights2 + self.factor * context_weights_2
+
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.out_channels, x.size(-2),
+                             x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        
+        out_ft[:, :, :self.modes1, :self.modes2] = \
+            self.compl_mul2d(
+                x_ft[:, :, :self.modes1, :self.modes2], weights1)
+        
+        out_ft[:, :, -self.modes1:, :self.modes2] = \
+            self.compl_mul2d(
+                x_ft[:, :, -self.modes1:, :self.modes2], weights2)
+
+        # Return to physical space
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        return x

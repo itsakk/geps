@@ -5,14 +5,13 @@ from fuels.datasets.lv import LotkaVolterraDataset
 from fuels.datasets.gs import GrayScottDataset
 from fuels.datasets.burgers import Burgers
 from fuels.datasets.kolmo import Turb2d
-from fuels.utils import SubsetRamdomSampler, SubsetSequentialSampler
 
 def DataLoaderODE(dataset, minibatch_size, shuffle=True):
     dataloader_params = {
         'dataset': dataset,
         'batch_size': minibatch_size,
         'num_workers': 0,
-        'shuffle': shuffle,
+        'shuffle': False,
         'pin_memory': True,
         'drop_last': False
     }
@@ -72,11 +71,8 @@ def param_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
         'params' : [# DAMPED
                     {"alpha": 0.20, "w0": 0.50, "wf":0.00, "f0": 0.0}, # Underdamped
                     {"alpha": 0.50, "w0": 0.50, "wf":0.00, "f0": 0.0}, # Critically damped
-                    # {"alpha": 1.50, "w0": 0.50, "wf":0.00, "f0": 0.0}, # Overdamped
                     
                     # # DRIVEN
-                    # {"alpha": 0.00, "w0": 0.50, "wf":0.05, "f0": 0.05}, # Subresonance
-                    # {"alpha": 0.00, "w0": 0.50, "wf":0.50, "f0": 0.1}, # Resonance
                     {"alpha": 0.00, "w0": 0.70, "wf":0.75,  "f0": 0.2}, # Beats
                     {"alpha": 0.00, "w0": 0.50, "wf":1.00, "f0": 0.1}  # Superresonance
         ]
@@ -92,17 +88,16 @@ def param_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
     dataset_train = DampedDrivenPendulum(**dataset_train_params)
     dataset_test  = DampedDrivenPendulum(**dataset_test_params)
 
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = True)
-    dataloader_test  = DataLoaderODE(dataset_test, batch_size_val, shuffle = False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False)
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
 
     # True parameters
     alphas = torch.Tensor([vals["alpha"] for vals in dataset_train_params["params"]])
     w0s = torch.Tensor([vals["w0"] for vals in dataset_train_params["params"]])
     wfs = torch.Tensor([vals["wf"] for vals in dataset_train_params["params"]])
     f0s = torch.Tensor([vals["f0"] for vals in dataset_train_params["params"]])
-    
     params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params
+    return dataloader_train, dataloader_test, params 
 
 def param_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
     dataset_train_params = {
@@ -131,7 +126,7 @@ def param_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
     dataset_test_params['t_horizon'] = 400
 
     dataset_train, dataset_test = GrayScottDataset(**dataset_train_params), GrayScottDataset(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
 
     f = torch.Tensor([ 0.03, 0.039, 0.03, 0.039])
@@ -166,7 +161,7 @@ def param_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16):
     dataset_test_params['t_horizon'] = 0.1
 
     dataset_train, dataset_test = Burgers(**dataset_train_params), Burgers(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True) #  // len(dataset_train_params['params'])
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False) #  // len(dataset_train_params['params'])
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False) # // len(dataset_train_params['params'])
 
     params = torch.Tensor([5e-1, 5e-2, 5e-4, 5e-1, 5e-2, 5e-4]).unsqueeze(-1)
@@ -202,7 +197,7 @@ def param_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):
     dataset_test_params['t_horizon'] = 2.4
 
     dataset_train, dataset_test = Turb2d(**dataset_train_params), Turb2d(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
 
     nu = torch.Tensor([1e-3, 1e-3, 1e-3, 1e-3, 1e-4, 1e-4, 1e-4, 1e-4])
@@ -260,43 +255,7 @@ def param_adapt_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25
     f0s = torch.Tensor([vals["f0"] for vals in dataset_train_params["params"]])
     
     params = torch.cat((w0s.unsqueeze(-1), alphas.unsqueeze(-1),wfs.unsqueeze(-1),f0s.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params      
-
-def param_adapt_lv(buffer_filepath, batch_size_train=1, batch_size_val=32):
-
-    betas = [0.3, 0.3, 1.125, 1.125]
-    deltas = [0.3, 1.125, 0.3, 1.125]
-
-    dataset_train_params = {
-        "path": buffer_filepath + '_train_ada',
-        "n_data_per_env": 1, 
-        "t_horizon": 10, 
-        "dt": 0.5, 
-        "method": "RK45", 
-        "group": "train",
-        "params": [{"alpha": 0.5, "beta": beta_i, "gamma": 0.5, "delta": delta_i} for beta_i, delta_i in zip(betas, deltas)]
-    }
-
-    dataset_test_params = dict()
-    dataset_test_params.update(dataset_train_params)
-    dataset_test_params["n_data_per_env"] = 32
-    dataset_test_params["group"] = "test"
-    dataset_test_params['path'] = buffer_filepath + '_test_ada'
-    dataset_test_params['t_horizon'] = 20
-
-    dataset_train = LotkaVolterraDataset(**dataset_train_params)
-    dataset_test = LotkaVolterraDataset(**dataset_test_params)
-    num_env = len(dataset_train_params["params"])
-
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
-
-    betas = torch.Tensor(betas)
-    deltas = torch.Tensor(deltas)
-
-    # True parameters
-    params = torch.cat((betas.unsqueeze(-1), deltas.unsqueeze(-1)), axis = 1)
-    return dataloader_train, dataloader_test, params
+    return dataloader_train, dataloader_test, params       
 
 def param_adapt_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
     dataset_train_params = {
@@ -326,7 +285,7 @@ def param_adapt_gs(buffer_filepath, batch_size_train=1, batch_size_val=32):
     dataset_test_params['t_horizon'] = 400
 
     dataset_train, dataset_test = GrayScottDataset(**dataset_train_params), GrayScottDataset(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=True)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False)
 
     f = torch.Tensor([ 0.042, 0.033, 0.033, 0.042]) 
@@ -359,8 +318,8 @@ def param_adapt_burgers(buffer_filepath, batch_size_train=16, batch_size_val=16)
     dataset_test_params['t_horizon'] = 0.1
 
     dataset_train, dataset_test = Burgers(**dataset_train_params), Burgers(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle  = True)
-    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle  = False)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle=False) #  // len(dataset_train_params['params'])
+    dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle=False) # // len(dataset_train_params['params'])
 
     params = torch.Tensor([1.0, 5e-5, 1.0, 5e-5]).unsqueeze(-1) 
     return dataloader_train, dataloader_test, params
@@ -391,7 +350,7 @@ def param_adapt_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):
     dataset_test_params['t_horizon'] = 2.4
 
     dataset_train, dataset_test = Turb2d(**dataset_train_params), Turb2d(**dataset_test_params)
-    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = True)
+    dataloader_train = DataLoaderODE(dataset_train, batch_size_train, shuffle = False)
     dataloader_test = DataLoaderODE(dataset_test, batch_size_val, shuffle = False)
 
     nu = torch.Tensor([1e-5, 1e-5, 1e-5, 1e-5])

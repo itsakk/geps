@@ -8,15 +8,12 @@ import torch.optim as optim
 
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
-
-from fuels.model.networks import *
-from fuels.utils import fix_seed, count_parameters
+from fuels.utils import fix_seed, count_parameters, init_weights
 from fuels.datasets import *
-from fuels.model.forecasters import *
-from fuels.losses import RelativeL2
-import matplotlib.pyplot as plt
+from fuels.losses import *
+from forecasters import *
 
-@hydra.main(config_path="config/model/", config_name="adapt.yaml")
+@hydra.main(config_path="../../config/aphinity/", config_name="adapt.yaml")
 def main(cfg: DictConfig) -> None:
 
     # device
@@ -27,44 +24,42 @@ def main(cfg: DictConfig) -> None:
     run_id = cfg.wandb.id
     run_name = cfg.wandb.name
 
-    # pretrained model run name
-    pretrain_model_run_name = cfg.pretrain.run_name
-
-    #data
     data_dir = cfg.data.dir
     dataset_name = cfg.data.dataset_name
     seed = cfg.data.seed
     path = os.path.join(data_dir, dataset_name)
+
+    # pretrained model run name
+    pretrain_model_run_name = cfg.pretrain.run_name
 
     # optim
     batch_size_train = cfg.optim.batch_size_train
     batch_size_val = cfg.optim.batch_size_val
     epochs = cfg.optim.epochs
     lr = cfg.optim.lr
+    init_type = cfg.optim.init_type
 
     # pretrained model path
-    pretrained_model_path = Path(os.getenv("WANDB_DIR")) / 'fuels' / 'new_ver' / 'pretrain' / dataset_name / "model" / pretrain_model_run_name
+    pretrained_model_path = Path(os.getenv("WANDB_DIR")) / 'aphinity' / 'new_ver' / 'pretrain' / dataset_name / "model" / pretrain_model_run_name
     checkpoint = torch.load(f"{pretrained_model_path}.pt", map_location=device)
     cfg = checkpoint['cfg']
 
     # model decoder
     state_c = cfg.model.state_c
-    code_c = cfg.model.code_c
     hidden_c = cfg.model.hidden_c
-    factor = cfg.model.factor
     is_complete = cfg.model.is_complete
     type_augment = cfg.model.type_augment
-    epsilon = cfg.model.teacher_forcing_init
-    epsilon_t = cfg.model.teacher_forcing_decay
-    epsilon_freq = cfg.model.teacher_forcing_update
 
     # model forecaster
     method = cfg.model.method
     options = cfg.model.options
 
-    if (dataset_name == 'gs') & (type_augment != ''):
+    if (dataset_name == 'gs'):
         options = dict(step_size = 1)
-        
+
+    # device
+    device = torch.device("cuda")
+
     # wandb
     run_dir = (
         os.path.join(os.getenv("WANDB_DIR"),
@@ -84,7 +79,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     run.tags = (
-            ("fuels",)
+            ("aphinity",)
             + (dataset_name,)
             + (type_augment,)
             + ("adapt",)
@@ -96,7 +91,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     # create model folder
-    model_dir = Path(os.getenv("WANDB_DIR")) / 'fuels' / 'new_ver' / 'adapt'/ dataset_name / "model"
+    model_dir = Path(os.getenv("WANDB_DIR")) / 'aphinity' / 'new_ver' / 'adapt'/ dataset_name / "model"
     os.makedirs(str(model_dir), exist_ok=True)
 
     # set seed
@@ -107,25 +102,22 @@ def main(cfg: DictConfig) -> None:
     params = params.to(device)
     num_env = len(params)
 
-    model = Forecaster(dataset_name, state_c, hidden_c, code_c, factor, num_env, is_complete, type_augment, method, options).to(device)
+    model = Forecaster(dataset_name, state_c, hidden_c, num_env, type_augment, is_complete, method, options).to(device)
 
     model_dict = model.state_dict()
     pretrained_dict = {k: v for k, v in checkpoint['model'].items() if (k in model_dict)}
-    if dataset_name == 'gs' or dataset_name == 'kolmo':
-        pretrained_dict['derivative.model_phy.params'] = pretrained_dict['derivative.model_phy.params'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2
-    pretrained_dict['derivative.codes'] = pretrained_dict['derivative.codes'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2)
-    pretrained_dict['derivative.model_aug.codes'] = pretrained_dict['derivative.model_aug.codes'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2)
+    pretrained_dict['derivative_estimator.model_phy.params'] = pretrained_dict['derivative_estimator.model_phy.params'].mean(dim = 0).repeat(num_env, 1) # torch.tensor(0).repeat(num_env, 2
 
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
     model = model.to(device)
 
-    for name, param in model.named_parameters():
-        if param.requires_grad and "codes" not in name and "params" not in name:
-            param.requires_grad = False
-        print("name, param.requires_grad : ", name, param.requires_grad)
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad and "codes" not in name and "params" not in name:
+    #         param.requires_grad = False
+    #     print("name, param.requires_grad : ", name, param.requires_grad)
     
-    optimizer = optim.Adam(model.parameters(), lr= lr, betas=(0.9, 0.999))
+    optimizer = optim.Adam(model.parameters(), lr, betas=(0.9, 0.999))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="min",
@@ -146,7 +138,6 @@ def main(cfg: DictConfig) -> None:
     nupdate = 20
     criterion = nn.MSELoss()
     criterion_eval = RelativeL2()
-    param_error = 0
 
     print("ntrain, ntest : ", ntrain, ntest)
     print("t_in : ", t_in)
@@ -155,27 +146,26 @@ def main(cfg: DictConfig) -> None:
     print("train.dataset[0]['states'].shape : ", train.dataset[0]['states'].shape)
     print("num_env : ", num_env)
     print(f"n_params forecaster: {count_parameters(model)}")
+    print("params : ", params)
 
-    epsilon_t = 0
     for epoch in range(epochs):
+
         step_show = epoch % nupdate == 0
         step_show_last = epoch == epochs - 1
         loss_train = 0
-        outputs_pendulum = []
-        targets_pendulum = []
-
-        if epoch % epsilon_freq == 0:
-            epsilon_t = epsilon_t * epsilon
 
         for _, data in enumerate(train):
             targets = data["states"].to(device)
             n_samples = len(targets)
             t = data["t"][0].to(device)
-            env = data["env"].to(device)
+            env = data['env'].to(device)
+            outputs = model(targets, t, env)
 
-            outputs = model(targets, t, env, epsilon_t)
             loss = criterion(outputs, targets)
-            loss.backward()
+
+            loss_total = loss
+            loss_total.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.)
             optimizer.step()
             optimizer.zero_grad()
                 
@@ -183,7 +173,7 @@ def main(cfg: DictConfig) -> None:
 
         loss_train /= ntrain
         scheduler.step(loss_train)
-
+     
         if True in (step_show, step_show_last):
             with torch.no_grad():
                 loss_test_in = 0
@@ -195,77 +185,59 @@ def main(cfg: DictConfig) -> None:
                     env = data_test['env'].to(device)
 
                     outputs_test = model(targets_test, t, env)
+
                     loss_in = criterion_eval(outputs_test[..., :t_in], targets_test[..., :t_in])
                     loss_out = criterion_eval(outputs_test[..., t_in:], targets_test[..., t_in:])
                     loss_test_in += loss_in.item() * n_samples
                     loss_test_out += loss_out.item() * n_samples
 
-                    if dataset_name == 'pendulum':
-                        random = np.random.randint(32)
-                        outputs_pendulum.append(outputs_test[random])
-                        targets_pendulum.append(targets_test[random])
-
-            if type_augment != '':
-                param_error = torch.mean(abs((model.derivative.model_phy.estimated_params - params)))
-
             loss_test_in /= ntest
             loss_test_out /= ntest
 
         if True in (step_show, step_show_last):
-            if dataset_name == 'pendulum':
-                fig, axs = plt.subplots(num_env, 1, figsize=(10, 15))  # Create a figure with 4 subplots
-
-                for i in range(num_env):  # Loop over the first 4 data samples
-                    axs[i].plot(targets_pendulum[i].cpu().detach().numpy()[0, :], label='target')
-                    axs[i].plot(outputs_pendulum[i].cpu().detach().numpy()[0, :], label='output')
-                    axs[i].legend()
-                    axs[i].set_xlabel('time')
-                    axs[i].set_title(f'Data sample {i + 1}')  # Set a title for each subplot
-
-                wandb.log(
-                    {
-                        "train_loss": loss_train,
-                        "loss_test_in": loss_test_in,
-                        "loss_test_out": loss_test_out,
-                        "param_errror_mape": param_error,
-                        "prediction": wandb.Image(fig),
-                        "lr": scheduler.get_last_lr()[0],
-                    },
-                )
-            else:
-                wandb.log(
-                    {
-                        "train_loss": loss_train,
-                        "loss_test_in": loss_test_in,
-                        "loss_test_out": loss_test_out,
-                        "param_errror_mape": param_error,
-                    },
-                )
+            wandb.log(
+                {
+                    "train_loss": loss_train,
+                    "loss_test_in": loss_test_in,
+                    "loss_test_out": loss_test_out,
+                },
+            )
 
         else:
 
             wandb.log(
                 {
                     "train_loss": loss_train,
-                    "lr": scheduler.get_last_lr()[0],
                 },
                 step=epoch,
                 commit=not step_show,
             )
-
-        if loss_train < best_loss:
-            best_loss = loss_train
-            torch.save(
-                {
-                    "cfg": cfg,
-                    "epoch": epoch,
-                    "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "loss": best_loss,
-                },
-                f"{model_dir}/{run_name}.pt",
-            )
-
+            
+        if dataset_name == 'pendulum':
+            if loss_test_in < best_loss:
+                best_loss = loss_test_in
+                torch.save(
+                    {
+                        "cfg": cfg,
+                        "epoch": epoch,
+                        "model": model.state_dict(),
+                        "optimizer": optimizer.state_dict(),
+                        "loss": best_loss,
+                    },
+                    f"{model_dir}/{run_name}.pt",
+                )
+        else:
+            if loss_train < best_loss:
+                best_loss = loss_train
+                torch.save(
+                    {
+                        "cfg": cfg,
+                        "epoch": epoch,
+                        "model": model.state_dict(),
+                        "loss": best_loss,
+                    },
+                    f"{model_dir}/{run_name}.pt",
+                )
     return best_loss
 
 if __name__ == "__main__":

@@ -1,139 +1,139 @@
-import numpy as np
 import shelve
-from torch.utils.data import Dataset
-from scipy.integrate import solve_ivp
 import torch
-from collections import OrderedDict
+import einops
+
+import numpy as np
 import scipy as sp
-from functools import partial
-import shelve
+import torch.nn.functional as F
+
+from torch.utils.data import Dataset
+from torchdiffeq import odeint
 
 MAX = np.iinfo(np.int32).max
 
 def box_filter(signal,kernel_size):
-        new = np.zeros(int(signal.shape[0]/kernel_size))
-        for i in range(int(signal.shape[0]/kernel_size)-1):
-               new[i] = np.mean(signal[i*kernel_size:(i+1)*kernel_size])
-        return new
+        kernel = torch.ones(kernel_size).cuda() / kernel_size
+        filtered_states = F.conv1d(signal, kernel.unsqueeze(0).unsqueeze(0), stride = kernel_size)
+        return filtered_states
 
-class BurgersF(Dataset):
+class Burgers(Dataset):
 
-    def __init__(self, n_data_per_env, t_horizon, params, dt, dx=2.,
-                 path=None, method='RK45', group='train'):
+    def __init__(self, n_data_per_env, t_horizon, params, dt_filt=1e-3, 
+                 N=16384, N_filt=256, path=None, group='train'):
         super().__init__()
         self.n_data_per_env = n_data_per_env
-        self.num_env = len(params)
         self.time_horizon = t_horizon
-        self.dx = dx
+        self.num_env = len(params)
+        self.dt_filt = dt_filt
+        self.N = N
+        self.N_filt = N_filt
         self.len = n_data_per_env * self.num_env
         self.indices = [list(range(env * n_data_per_env, (env + 1) * n_data_per_env)) for env in range(self.num_env)]
-        self.N = 16384
-        self.fdx = 2 * np.pi /(self.N)
-        self.num_env = len(params)
         self.params_eq = params
         self.test = (group == 'test')
-        self.max = np.iinfo(np.int32).max
+        self.max = torch.iinfo(torch.int32).max
         self.data = shelve.open(path)
-        self.dt = dt
 
-    def _derive1(self,a):
+    def _derive1(self, a):
         return(
-            np.roll(a,1)
-            -a
-        )
+                torch.roll(a, 1)
+                -a
+            )
 
-    def _mean_f(self,a):
+    def _mean_f(self, a):
         return(
-            np.roll(a,1)
-            +a
-        )/2
+                torch.roll(a, 1)
+                +a
+            )/2
+
+    def _laplacian1D(self, a):
+        return (
+                - 2 * a
+                + torch.roll(a, 1) 
+                + torch.roll(a, -1)
+            ) / (self.fdx ** 2)
 
     def _laplacian1Dbis(self, a):
         return (
             + 2 * a
-            + np.roll(a,+1) 
-            + np.roll(a,-1)
+            + torch.roll(a,+1) 
+            + torch.roll(a,-1)
             ) / (self.fdx ** 2)
 
-    def _laplacian1D(self, a):
-        return (
-            - 2 * a
-            + np.roll(a,+1) 
-            + np.roll(a,-1)
-        ) / (self.fdx ** 2)
-    
     def _fluxRight(self, a):
-        phi1 = np.abs(self._laplacian1D(a))/np.abs(self._laplacian1Dbis(a))
-        phi2 = np.roll(phi1,+1)
+        phi1 = torch.abs(self._laplacian1D(a))/torch.abs(self._laplacian1Dbis(a))
+        phi2 = torch.roll(phi1,+1)
         k2 = 1
-        epsilon2 = k2*np.maximum(phi1,phi2) 
-        epsilon4 = np.maximum(0,1/60 - 1/5*epsilon2)
-
+        epsilon2 = k2*torch.maximum(phi1,phi2) 
+        epsilon4 = torch.maximum(torch.tensor(0),1/60 - 1/5*epsilon2)
         return(
                 + self._mean_f(1/2*a**2)
                 - 1/6*self._derive1(self._derive1(self._mean_f(1/2*a**2)))
                 + 1/30*self._derive1(self._derive1(self._derive1(self._derive1(self._mean_f(1/2*a**2)))))
-                - np.abs(self._mean_f(a)) *(epsilon2*self._derive1(a) + epsilon4*(self._derive1(self._derive1(self._derive1(self._derive1(self._derive1(a)))))))
-            )
-    
-    def forcing(self, forcing_func, y0, t, F, w):
-        if forcing_func == 'rand':
-            force = F * np.random.randn(*y0.shape)
-        elif forcing_func == 'exp':
-            force = F * np.exp(-w*y0**2)
-        elif forcing_func == "periodic":
-            force = F * (np.sin(w*y0) + np.cos(w*t))
-        else:
-            force = 0
-        return force
-        
-    def _f(self,t, x, env = 0):
-        mu = self.params_eq[env]['mu']
-        F_ = self.params_eq[env]['F']
-        w = self.params_eq[env]['w']
-        force_func = self.params_eq[env]['force']
-        return  -(self._fluxRight(x)-self._fluxRight(np.roll(x,-1)))/self.fdx + mu*self._laplacian1D(x) + self.forcing(force_func, x, t, F_, w)
-    
-    def energy_spectrum(self, N,k0 = 5):
-            ku = 2*np.pi*sp.fft.fftfreq(N,self.fdx)
-            ku = 2/3*np.pi**(-1/2)*(ku/k0)**4*1/k0*np.exp(-(ku/k0)**2)
-            ku[np.abs(ku)<1e-34] = 0
-            return ku
+                - torch.abs(self._mean_f(a)) *(epsilon2*self._derive1(a) + epsilon4*(self._derive1(self._derive1(self._derive1(self._derive1(self._derive1(a)))))))
+        )
 
-    def _get_initial_condition(self, index):
+    def exp_forcing(self, w = 4, F = 1):
+        return F * torch.exp(-w * self.x ** 2)
+    
+
+    def periodic_forcing(self, w = 4, t = 0, F = 1):
+        return F * (torch.sin(w * self.x) + torch.cos(w * t))
+
+    def forcing(self, force_func, U, t, w, F):
+        if force_func == 'sin':
+            return self.periodic_forcing(w, t, F)
+        elif force_func == 'exp':
+            return self.exp_forcing(w, F)
+        elif force_func == 'rand':
+            return self.randn_forcing(U, F)
+        else:
+            return 0
+        
+    def _f(self, t, x):
+        return -(self._fluxRight(x)-self._fluxRight(torch.roll(x, -1)))/self.fdx + self.mu * self._laplacian1D(x) + self.forcing(self.force_func, x, t, self.w, self.F)
+    
+    def energy_spectrum(self, N, fdx, k0 = 5):
+        ku = 2*np.pi*sp.fft.fftfreq(N, fdx)
+        ku = 2/3*np.pi**(-1/2)*(ku/k0)**4*1/k0*np.exp(-(ku/k0)**2)
+        ku[np.abs(ku)<1e-34] = 0
+        return ku
+
+    def _get_initial_condition(self, index, N, fdx):
         np.random.seed(index if not self.test else self.max - index)
-        energy = self.energy_spectrum(self.N) # 1e6
-        random_psi = np.random.rand(self.N//2-1)
+        energy = self.energy_spectrum(N, fdx) # 1e6
+        random_psi = np.random.rand(N//2-1)
         random_psi = np.concatenate((np.array([0]),random_psi,np.random.rand(1),-random_psi[::-1]))
         random_phases = np.exp(2 * np.pi * 1j * random_psi)
-        velocities = self.N*(2*energy)**(1/2)*random_phases
+        velocities = N*(2*energy)**(1/2)*random_phases
         u_result = sp.fft.ifft(velocities).real
         return u_result
-    
+
     def __getitem__(self, index):
         env = index // self.n_data_per_env
         env_index = index % self.n_data_per_env
+
         if self.data.get(str(index)) is None:
+            self.mu = self.params_eq[env]['mu']
+            self.F = self.params_eq[env]['F']
+            self.w = self.params_eq[env]['w']
+            self.force_func = self.params_eq[env]['force']
+            self.fdx = (self.params_eq[env]['domain'] * np.pi) / self.N
+            self.x = torch.linspace(0, self.params_eq[env]['domain'] * np.pi, self.N).cuda()
             print(f'generating {env},{env_index}')
-            y0 = self._get_initial_condition(env_index)
-
-            states = solve_ivp(partial(self._f, env = env), (0., self.time_horizon), y0=y0, method='RK45', t_eval=np.arange(0., self.time_horizon, 1e-5)).y
-
-            #temporal sampling
-            states = states[:,::int(1e5*self.dt)]
-            states = states[:,:int(self.time_horizon/self.dt)]
-
-            #spatial filtering
-            states = np.apply_along_axis(box_filter,axis=0,arr=states,kernel_size=int(int(self.N)*self.dx))
             
+            y0 = self._get_initial_condition(env_index, self.N, self.fdx)
+            y0 = torch.from_numpy(y0).cuda()
+            states = odeint(self._f, y0=y0, t=torch.arange(0., self.time_horizon, self.dt_filt).cuda(), method= 'scipy_solver', options = dict(solver = 'RK45')).cuda()
+
+            states = states.unsqueeze(1).float()
+
+            states = box_filter(signal = states, kernel_size= self.N // self.N_filt)
+            states = einops.rearrange(states, 't c x -> c x t').cpu().detach()
             self.data[str(index)] = states
-            states = torch.from_numpy(states).float()
-            states = states.resize(1,states.size()[0],states.size()[1])
         else:
-            states = torch.from_numpy(self.data[str(index)]).float()
-            states = states.resize(1,states.size()[0],states.size()[1])
-            
-        return {'states': states, 't': torch.arange(0, self.time_horizon, self.dt).float(), 'env': env}
+            states = self.data[str(index)]
+        return {'states': states, 't': torch.arange(0, self.time_horizon, self.dt_filt).float(), 'env': env}
     
     def __len__(self):
         return int(self.len)

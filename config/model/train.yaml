@@ -28,6 +28,9 @@ model:
   is_complete: False
   type_augment: "serie"
   options:
+  teacher_forcing_init: 0.99
+  teacher_forcing_decay: 0.99
+  teacher_forcing_update: 10
 
 wandb:
   entity: "spatiotemp-isir"

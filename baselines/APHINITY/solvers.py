@@ -3,17 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-class DampedDrivenPDE(nn.Module):
+class DampedPendulumParamPDE(nn.Module):
 
-    def __init__(self, is_complete = False, code = 2):
+    def __init__(self, is_complete = False, n_env = 2):
         super().__init__()
-        self.params = nn.Parameter(torch.cat((torch.full((1, 1), 0.2), torch.full((1, 1), 0.1), torch.full((1, 1), 0.2), torch.full((1, 1), 0.5)), axis = 1))
-        self.weight = nn.Parameter(torch.empty((4, code)))
+        self.params = nn.Parameter(torch.cat((torch.full((n_env, 1), 0.2), torch.full((n_env, 1), 0.1), torch.full((n_env, 1), 0.2), torch.full((n_env, 1), 0.5)), axis = 1))
         self.is_complete = is_complete
 
-    def forward(self, t, y0, env, codes):
-        self.estimated_params = self.params + F.linear(codes, self.weight) # codes = [num_env, code_dim], params = [1, 2], weight = [2, code_dim] => estimated_params = [num_env, 2]
-        # self.estimated_params = self.params
+    def forward(self, t, y0, env):
+        self.estimated_params = self.params
 
         q = y0[:,0:1]
         p = y0[:,1:2]
@@ -29,40 +27,12 @@ class DampedDrivenPDE(nn.Module):
             dqdt = p
             dpdt = - omega0_square * torch.sin(q) + f0 * torch.cos(wf * t)
         return torch.cat([dqdt, dpdt], dim = 1)
-
-class LotkaVolteraPDE(nn.Module):
-
-    def __init__(self, is_complete = False, code = 2):
-        super().__init__()
-        self.params = nn.Parameter(torch.full((1, 2), 0.1))
-        #self.weight = nn.Parameter(torch.empty((2, code)))
-        self.is_complete = is_complete
-
-    def forward(self, t, y0, env, codes):
-        self.estimated_params = self.params + F.linear(codes, self.weight)
-
-        # params 
-        alpha = gamma = 0.5
-        delta = self.estimated_params[env.long(), 1:2]
-        beta = self.estimated_params[env.long(), 0:1]
-
-        x = y0[:, 0:1]
-        y = y0[:, 1:2]
-
-        if self.is_complete:
-            dxdt = alpha * x - beta * x * y
-            dydt = delta * x * y - gamma * y
-        else:
-            dxdt = alpha * x - beta * y
-            dydt = delta * x - gamma * y
-        return torch.cat([dxdt, dydt], dim = 1)
-
+    
 class BurgersParamPDE(nn.Module):
     
-    def __init__(self, code = 2):
+    def __init__(self, n_env = 2):
         super().__init__()
-        self.params = nn.Parameter(torch.full((1, 1), 1e-2))
-        self.weight = nn.Parameter(torch.empty((1, code)))
+        self.params = nn.Parameter(torch.full((n_env, 1), 1e-2))
         self.dx = 128
         self.fdx = 2 * np.pi / self.dx
         self._laplacian = nn.Parameter(torch.tensor(
@@ -94,9 +64,9 @@ class BurgersParamPDE(nn.Module):
                 + 1/30*self._derive1(self._derive1(self._derive1(self._derive1(self._mean_f(1/2*a**2)))))
         )
 
-    def forward(self, t, y0, env, codes):
+    def forward(self, t, y0, env):
         U = y0[:, 0, :]
-        self.estimated_params = self.params + F.linear(codes, self.weight)
+        self.estimated_params = self.params
         mu = self.estimated_params[env.long(), 0:1]
 
         U_ = U
@@ -105,13 +75,12 @@ class BurgersParamPDE(nn.Module):
 
 class GrayScottParamPDE(nn.Module):
 
-    def __init__(self, is_complete, code, n_env):
+    def __init__(self, is_complete, n_env):
         super().__init__()
 
         self._dx = 1
         self.is_complete = is_complete
         self.params = nn.Parameter(torch.full((n_env, 2), 0.05))
-        self.weight = nn.Parameter(torch.empty((2, code)))
         self._laplacian = nn.Parameter(torch.tensor(
             [
                 [ 0.25,  0.5, 0.25],
@@ -120,8 +89,8 @@ class GrayScottParamPDE(nn.Module):
             ],
         ).float().view(1, 1, 3, 3) / (self._dx ** 2), requires_grad=False)
     
-    def forward(self, t, y0, env, codes):
-        self.estimated_params = self.params # + F.linear(codes, self.weight)
+    def forward(self, t, y0, env):
+        self.estimated_params = self.params
         params = self.estimated_params[env.long(), :]
 
         f, k = params[:, 0:1, None, None], params[:, 1:2, None, None]
@@ -146,10 +115,9 @@ class GrayScottParamPDE(nn.Module):
     
 class Turb2dPDE(nn.Module):
 
-    def __init__(self, code, n_env):
+    def __init__(self, n_env):
         super().__init__()
         self.params = nn.Parameter(torch.cat((torch.full((n_env, 1), 5e-3), torch.full((n_env, 1), 1)), axis = 1))
-        self.weight = nn.Parameter(torch.empty((2, code)))
         self.N = 64
         self.dx = np.pi / self.N
         self._laplacian = nn.Parameter(torch.tensor(
@@ -159,7 +127,6 @@ class Turb2dPDE(nn.Module):
                 [ 1.0,  1.0, 0.0],
             ],
         ).float().view(1, 1, 3, 3), requires_grad=False)
-        self.domain = torch.Tensor([0.75, 1.0, 0.75, 1.0, 0.75, 1.0, 0.75, 1.0]).unsqueeze(-1).cuda() if n_env == 8 else torch.Tensor([1.5, 2.0, 1.5, 2.0]).unsqueeze(-1).cuda()
 
     def derive_x(self,a):
         return(
@@ -197,12 +164,12 @@ class Turb2dPDE(nn.Module):
         uf[:, 0, 0] = 0
         return (torch.fft.ifft2(N**2*uf).real)[...,:self.N,:self.N]
 
-    def f2(self, x, env, codes):
-        self.estimated_params = self.params #+ F.linear(codes, self.weight)
+    def f2(self, x, env):
+        self.estimated_params = self.params
         params = self.estimated_params[env.long(), :]
         mu, domain = params[:, 0:1], params[:, 1:2]
-    
-        domain = self.domain[env.long()]
+        domain = torch.Tensor([0.75, 1.0, 0.75, 1.0, 0.75, 1.0, 0.75, 1.0]).unsqueeze(-1).cuda()
+        domain = domain[env.long()]
         fdx = domain * self.dx
         psi = self.ps(self.N, fdx, -x)
         mu = mu[..., None]
@@ -220,19 +187,17 @@ class Turb2dPDE(nn.Module):
             +torch.roll(torch.roll(x,-1,dims=2),+1,dims=1)*(torch.roll(psi,-1,dims=2)-torch.roll(psi,+1,dims=1))) / (4* fdx**2)
         return (-(J1+J2+J3)/3 + mu*self._laplacian2D(x, fdx))
         
-    def forward(self, t, y0, env, codes):
-        dudt = self.f2(y0[:, 0], env, codes).unsqueeze(1)
+    def forward(self, t, y0, env):
+        dudt = self.f2(y0[:, 0], env).unsqueeze(1)
         return dudt
         
-def get_numerical_solver(dataset_name, code_c, is_complete, n_env):
+def get_numerical_solver(dataset_name, n_env, is_complete):
     if dataset_name == 'pendulum':
-        model_phy = DampedDrivenPDE(is_complete=is_complete, code = code_c)
-    elif dataset_name == 'lv':
-        model_phy = LotkaVolteraPDE(is_complete=is_complete, code = code_c)
+        model_phy = DampedPendulumParamPDE(is_complete=is_complete, n_env = n_env)
     elif "gs" in dataset_name:
-        model_phy = GrayScottParamPDE(is_complete=is_complete, code = code_c, n_env = n_env)
+        model_phy = GrayScottParamPDE(is_complete=is_complete, n_env = n_env)
     elif "burgers" in dataset_name:
-        model_phy = BurgersParamPDE(code = code_c)
+        model_phy = BurgersParamPDE(n_env = n_env)
     elif dataset_name == 'kolmo':
-        model_phy = Turb2dPDE(code = code_c, n_env = n_env)
+        model_phy = Turb2dPDE(n_env = n_env)
     return model_phy
