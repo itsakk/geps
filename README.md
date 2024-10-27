@@ -25,7 +25,7 @@ export MINICONDA_PATH=your_anaconda_path
 
 # 2. Data
 
-We report in datasets the solvers used to generate the different datasets.
+We report in the datasets folder the solvers used to generate the different datasets.
 
 For the combined equation, we used the same solver than in https://github.com/brandstetter-johannes/LPSDA
 
