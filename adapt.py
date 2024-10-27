@@ -9,11 +9,12 @@ import torch.optim as optim
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 
-from fuels.model.networks import *
-from fuels.utils import fix_seed, count_parameters
-from fuels.datasets import *
-from fuels.model.forecasters import *
-from fuels.losses import RelativeL2
+from torch.utils.data import Dataset
+from geps.model.networks import *
+from geps.utils import fix_seed, count_parameters
+from geps.datasets import *
+from geps.model.forecasters import *
+from geps.losses import RelativeL2
 import matplotlib.pyplot as plt
 
 @hydra.main(config_path="config/model/", config_name="adapt.yaml")
@@ -43,7 +44,7 @@ def main(cfg: DictConfig) -> None:
     lr = cfg.optim.lr
 
     # pretrained model path
-    pretrained_model_path = Path(os.getenv("WANDB_DIR")) / 'fuels' / 'new_ver' / 'pretrain' / dataset_name / "model" / pretrain_model_run_name
+    pretrained_model_path = Path(os.getenv("WANDB_DIR")) / 'geps' / 'new_ver' / 'pretrain' / dataset_name / "model" / pretrain_model_run_name
     checkpoint = torch.load(f"{pretrained_model_path}.pt", map_location=device)
     cfg = checkpoint['cfg']
 
@@ -84,7 +85,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     run.tags = (
-            ("fuels",)
+            ("geps",)
             + (dataset_name,)
             + (type_augment,)
             + ("adapt",)
@@ -96,7 +97,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     # create model folder
-    model_dir = Path(os.getenv("WANDB_DIR")) / 'fuels' / 'new_ver' / 'adapt'/ dataset_name / "model"
+    model_dir = Path(os.getenv("WANDB_DIR")) / 'geps' / 'new_ver' / 'adapt'/ dataset_name / "model"
     os.makedirs(str(model_dir), exist_ok=True)
 
     # set seed
@@ -121,7 +122,7 @@ def main(cfg: DictConfig) -> None:
     model = model.to(device)
 
     for name, param in model.named_parameters():
-        if param.requires_grad and "codes" not in name and "params" not in name:
+        if param.requires_grad and "codes" not in name: 
             param.requires_grad = False
         print("name, param.requires_grad : ", name, param.requires_grad)
     
@@ -155,8 +156,9 @@ def main(cfg: DictConfig) -> None:
     print("train.dataset[0]['states'].shape : ", train.dataset[0]['states'].shape)
     print("num_env : ", num_env)
     print(f"n_params forecaster: {count_parameters(model)}")
+    print("len(train) : ", len(train))
 
-    epsilon_t = 0
+    #epsilon_t = 0
     for epoch in range(epochs):
         step_show = epoch % nupdate == 0
         step_show_last = epoch == epochs - 1
@@ -172,7 +174,6 @@ def main(cfg: DictConfig) -> None:
             n_samples = len(targets)
             t = data["t"][0].to(device)
             env = data["env"].to(device)
-
             outputs = model(targets, t, env, epsilon_t)
             loss = criterion(outputs, targets)
             loss.backward()

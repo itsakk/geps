@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from functools import partial
 from torchdiffeq import odeint
-from fuels.model.solvers import get_numerical_solver
-from fuels.model.networks import get_nn_model
+from geps.model.solvers import get_numerical_solver
+from geps.model.networks import get_nn_model
 import numpy as np
 
 class Derivative(nn.Module):
@@ -13,7 +13,7 @@ class Derivative(nn.Module):
         self.codes = nn.Parameter(0 * torch.ones(n_env, code_c))
         self.model_phy = get_numerical_solver(dataset_name, code_c, is_complete, n_env)
         self.model_aug = get_nn_model(dataset_name, in_dim, out_dim, factor, self.codes)
-
+    
     def forward(self, t, y0, env):
         if self.type_augment == 'serie':
             y_phy = self.model_phy(t, y0, env, self.codes)
@@ -35,7 +35,7 @@ class Derivative(nn.Module):
 class Forecaster(nn.Module):
     def __init__(self, dataset_name, in_dim, out_dim, code_c, factor, n_env, is_complete, type_augment, method, options):
         super().__init__()
-        self.method = method
+        self.method = 'euler'
         self.options = options
         self.int_ = odeint
         self.derivative = Derivative(dataset_name, in_dim, out_dim, code_c, factor, n_env, is_complete, type_augment)

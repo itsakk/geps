@@ -14,7 +14,20 @@ from datasets import *
 from forecasters import *
 from fuels.losses import *
 from metalearning import *
+from torch.utils.data import Dataset
 
+class CustomDataset(Dataset):
+    def __init__(self, states, t, env):
+        self.states = states
+        self.t = t
+        self.env = env
+
+    def __len__(self):
+        return len(self.states)  # assuming all tensors have the same length
+
+    def __getitem__(self, idx):
+        return {'states': self.states[idx], 't': self.t[idx], 'env': self.env[idx]}
+    
 @hydra.main(config_path="../../config/cavia/", config_name="adapt.yaml")
 def main(cfg: DictConfig) -> None:
 
@@ -45,6 +58,7 @@ def main(cfg: DictConfig) -> None:
 
     # pretrained model path
     pretrained_model_path = Path(os.getenv("WANDB_DIR")) / 'cavia' / 'new_ver' / 'pretrain' / dataset_name / "model" / pretrain_model_run_name
+
     checkpoint = torch.load(f"{pretrained_model_path}.pt", map_location=device)
     cfg = checkpoint['cfg']
     
@@ -93,7 +107,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     # create model folder
-    model_dir = Path(os.getenv("WANDB_DIR")) / 'cavia' / 'new_ver' / 'adapt'/ dataset_name / "model"
+    model_dir = Path(os.getenv("WANDB_DIR")) / 'cavia' / 'new_ver' / 'adapt' / dataset_name / "model"
     os.makedirs(str(model_dir), exist_ok=True)
 
     # set seed
@@ -103,6 +117,27 @@ def main(cfg: DictConfig) -> None:
     train, test, params = init_adapt_dataloaders(dataset_name, batch_size_train, batch_size_val, os.path.join(path, dataset_name))
     params = params.to(device)
     num_env = len(params)
+
+    # data = next(iter(train))
+    # u_train = data['states']
+    # t_train = data['t']
+    # env_train = data['env']
+    # ntrain = 1
+
+    # u_train = torch.cat([u_train[i * 16 : i * 16 + ntrain] for i in range(4)])
+    # env_train = torch.cat([env_train[i * 16 : i * 16 + ntrain] for i in range(4)])
+    # ntrain = len(u_train)
+    
+    # print(env_train)
+
+    # # create torch dataset
+    # train_dataset = CustomDataset(u_train, t_train[:ntrain], env_train)
+    # train = DataLoader(
+    #     train_dataset,
+    #     batch_size=1,
+    #     shuffle=False,
+    #     num_workers=0,
+    # )
 
     model = Forecaster(dataset_name, state_c, hidden_c, method, options, ctx_dim).to(device)
     model_dict = model.state_dict()
@@ -146,6 +181,7 @@ def main(cfg: DictConfig) -> None:
     print("num_env : ", num_env)
     print(f"n_params forecaster: {count_parameters(model)}")
     print("params : ", params)
+    print("len(test) : ", len(test))
 
     for epoch in range(epochs):
         model.train()
@@ -167,7 +203,7 @@ def main(cfg: DictConfig) -> None:
 
         loss_train /= ntrain
         scheduler.step(loss_train)
-
+        print("len(contexts) : ", len(contexts))
         if True in (step_show, step_show_last):
             loss_test_in = 0
             loss_test_out = 0

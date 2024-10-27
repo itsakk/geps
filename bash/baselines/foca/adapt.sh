@@ -20,12 +20,12 @@ epochs=10
 inner_lr=1.0
 outer_lr=0.001
 inner_steps=100
-seed=123
+seed=42
 hidden_c=64
 state_c=2
 ctx_dim=2
 tau=0.1
-run_name='sunny-yogurt-1947'
+run_name='astral-lake-2268'
 
 # burgers morning-bird-1374
 # gs warm-gorge-1373

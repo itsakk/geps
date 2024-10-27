@@ -224,6 +224,52 @@ class Turb2dPDE(nn.Module):
         dudt = self.f2(y0[:, 0], env, codes).unsqueeze(1)
         return dudt
         
+class Combined_equation(nn.Module):
+    def __init__(self,
+                 code,
+                 n_env=None
+                 ):
+        super().__init__()
+        self.params = nn.Parameter(torch.full((n_env, 4), 0.1))
+        self.weight = nn.Parameter(torch.empty((4, code)))
+        self.L=32
+        
+    def psdiff(self, x, order=1, period=None, axis=-1):
+        if period is None:
+            period = 2 * torch.pi
+
+        # Compute FFT
+        ft = torch.fft.fft(x, dim=axis)
+        
+        # Generate frequency array
+        n = x.shape[axis]
+        freq = torch.fft.fftfreq(n, d=1.0/n)
+        
+        # Reshape freq to match the dimensionality of ft
+        shape = [1] * len(x.shape)
+        shape[axis] = -1
+        freq = freq.reshape(shape)
+        
+        # Compute the multiplier
+        multiplier = (2j * torch.pi * freq / period) ** order
+        
+        # Apply the multiplier
+        ft_diff = ft * multiplier.cuda()
+        
+        # Inverse FFT
+        return torch.fft.ifft(ft_diff, dim=axis).real
+    
+    def forward(self, t, u, env, codes):
+        self.estimated_params = self.params + F.linear(codes, self.weight)
+        params = self.estimated_params[env.long(), :]
+        alpha, beta, delta, gamma = params[:, 0:1], params[:, 1:2], params[:, 2:3], params[:, 3:4]
+        ux = u * self.psdiff(u, period=self.L)
+        uxx = self.psdiff(u, order=2, period=self.L)
+        uxxx = self.psdiff(u, order=3, period=self.L)
+        uxxxx = self.psdiff(u,order=4, period=self.L)
+        dudt = - alpha*ux + beta*uxx - delta*uxxx - gamma*uxxxx
+        return dudt
+
 def get_numerical_solver(dataset_name, code_c, is_complete, n_env):
     if dataset_name == 'pendulum':
         model_phy = DampedDrivenPDE(is_complete=is_complete, code = code_c)
@@ -235,4 +281,8 @@ def get_numerical_solver(dataset_name, code_c, is_complete, n_env):
         model_phy = BurgersParamPDE(code = code_c)
     elif dataset_name == 'kolmo':
         model_phy = Turb2dPDE(code = code_c, n_env = n_env)
+    elif dataset_name == 'combined':
+        model_phy = Combined_equation(code = code_c, n_env = n_env)
+    else:
+        model_phy = None
     return model_phy

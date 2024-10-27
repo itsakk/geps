@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-class ROCAConv1D(nn.Module):
+class GEPSConv1D(nn.Module):
 
     def __init__(
         self,
@@ -43,12 +43,16 @@ class ROCAConv1D(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        bound = 1 / math.sqrt(self.in_channels * self.kernel_size)
-        nn.init.uniform_(self.weight, -bound, bound)
-        nn.init.uniform_(self.A, -bound, bound)
-        nn.init.uniform_(self.B, -bound, bound)
-        nn.init.uniform_(self.bias, -bound, bound)
-        nn.init.uniform_(self.bias_context, -bound, bound)
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.B, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            if fan_in != 0:
+                bound = 1 / math.sqrt(fan_in)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias_context, -bound, bound)
 
     def stride_input(self, inputs, kernel_size, stride):
         batch_size, channels, seq_len = inputs.shape
@@ -74,7 +78,7 @@ class ROCAConv1D(nn.Module):
         input_windows = self.stride_input(inputs, self.kernel_size, self.stride)
         return torch.einsum('bihw,boiw->boh', input_windows, combined_weight) + combined_bias[..., None]
     
-class ROCAConv2D(nn.Module):
+class GEPSConv2D(nn.Module):
 
     def __init__(
         self,
@@ -113,12 +117,16 @@ class ROCAConv2D(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        bound = 1 / math.sqrt(self.in_channels * self.kernel_size)
-        nn.init.uniform_(self.weight, -bound, bound)
-        nn.init.uniform_(self.A, -bound, bound)
-        nn.init.uniform_(self.B, -bound, bound)
-        nn.init.uniform_(self.bias, -bound, bound)
-        nn.init.uniform_(self.bias_context, -bound, bound)
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.B, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            if fan_in != 0:
+                bound = 1 / math.sqrt(fan_in)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias_context, -bound, bound)
 
     def stride_input(self, inputs, kernel_size, stride):
         batch_size, channels, h, w = inputs.shape
@@ -145,7 +153,7 @@ class ROCAConv2D(nn.Module):
         input_windows = self.stride_input(inputs, self.kernel_size, self.stride)
         return torch.einsum('bchwkt,bfckt->bfhw', input_windows, combined_weight) + combined_bias[..., None, None]
     
-class ROCALinear(nn.Module):
+class GEPSLinear(nn.Module):
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True, 
                  code: int = 2, factor: int = 1, device=None, dtype=None) -> None:
@@ -169,12 +177,16 @@ class ROCALinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        bound = 1 / math.sqrt(self.in_features)
-        nn.init.uniform_(self.weight, -bound, bound)
-        nn.init.uniform_(self.A, -bound, bound)
-        nn.init.uniform_(self.B, -bound, bound)
-        nn.init.uniform_(self.bias, -bound, bound)
-        nn.init.uniform_(self.bias_context, -bound, bound)
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.B, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            if fan_in != 0:
+                bound = 1 / math.sqrt(fan_in)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias_context, -bound, bound)
 
     def forward(self, input: torch.Tensor, codes: torch.Tensor) -> torch.Tensor:
         weights = torch.einsum("ir,  brp-> bip", self.A, codes)
@@ -183,7 +195,8 @@ class ROCALinear(nn.Module):
         combined_weight = self.weight + self.factor * context_weights
         combined_bias = self.bias + self.factor * context_bias
         return torch.bmm(input.unsqueeze(1), combined_weight).squeeze(1) + combined_bias
-class ROCALinear1D(nn.Module):
+    
+class GEPSLinear1D(nn.Module):
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True, 
                  code: int = 2, factor: int = 1, device=None, dtype=None) -> None:
@@ -207,12 +220,16 @@ class ROCALinear1D(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        bound = 1 / math.sqrt(self.in_features)
-        nn.init.uniform_(self.weight, -bound, bound)
-        nn.init.uniform_(self.A, -bound, bound)
-        nn.init.uniform_(self.B, -bound, bound)
-        nn.init.uniform_(self.bias, -bound, bound)
-        nn.init.uniform_(self.bias_context, -bound, bound)
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.B, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            if fan_in != 0:
+                bound = 1 / math.sqrt(fan_in)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias, -bound, bound)
+                nn.init.uniform_(self.bias_context, -bound, bound)
 
     def forward(self, input: torch.Tensor, codes: torch.Tensor) -> torch.Tensor:
         weights = torch.einsum("ir,  brp-> bip", self.A, codes)
@@ -222,9 +239,53 @@ class ROCALinear1D(nn.Module):
         combined_bias = self.bias + self.factor * context_bias
         return torch.bmm(input, combined_weight) + combined_bias.unsqueeze(1)
 
-class ROCASpectralConv2d_fast(nn.Module):
+
+class GEPSSpectralConv1d_fast(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1, code, factor = 1):
+        super(GEPSSpectralConv1d_fast, self).__init__()
+
+        """
+        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        """
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        # Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes1 = modes1
+        self.factor = factor
+
+        self.scale = (1 / (in_channels * out_channels))
+        self.weights1 = nn.Parameter(
+            self.scale * torch.rand(in_channels, out_channels, self.modes1, dtype=torch.cfloat))
+        
+        self.A_1 = nn.Parameter(torch.empty((in_channels, code, self.modes1)))
+        self.B_1 = nn.Parameter(torch.empty((code, out_channels, self.modes1)))
+
+    # Complex multiplication
+    def compl_mul1d(self, a, b):
+        res = torch.einsum("bix,biox->box", a, b)
+        return res
+
+    def forward(self, x, codes):
+        batchsize = x.shape[0]
+        # Compute Fourier coeffcients up to factor of e^(- something constant)
+        x_ft = torch.fft.rfftn(x, dim=[2])
+
+        weights_1 = torch.einsum("icm, bcr-> birm", self.A_1, codes)
+        context_weights_1 = torch.einsum("birm, rom -> biom", weights_1, self.B_1)
+        weights1 = self.weights1 + self.factor * context_weights_1
+
+        # Multiply relevant Fourier modes
+        out_ft = torch.zeros(batchsize, self.in_channels, x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes1] = self.compl_mul1d(x_ft[:, :, :self.modes1], weights1)
+
+        # Return to physical space
+        x = torch.fft.irfftn(out_ft, s=[x.size(-1)], dim=[2])
+        return x
+    
+class GEPSSpectralConv2d_fast(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2, code, factor = 1):
-        super(ROCASpectralConv2d_fast, self).__init__()
+        super(GEPSSpectralConv2d_fast, self).__init__()
 
         """
         2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    

@@ -8,4 +8,15 @@
 *.ipynb
 *_cases.py
 outputs/
-fuels.egg-info/
+geps.egg-info/
+baselines/
+exp_gen/
+figures/
+bash/baselines/
+config/cavia
+config/foca
+config/leads
+config/aphynity
+exp_gen/
+notebooks/
+slurm_run/

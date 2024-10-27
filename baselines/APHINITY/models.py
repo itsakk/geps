@@ -215,7 +215,7 @@ class MLP(nn.Module):
 def get_nn_model(dataset_name, in_dim, out_dim):
     if dataset_name == 'pendulum':
         model = MLP(in_dim, out_dim)
-    elif dataset_name == 'burgers':
+    elif dataset_name in ['burgers', 'combined']:
         model = CNN1D(in_dim, out_dim, 7)
     elif dataset_name == 'gs':
         model = CNN2D(in_dim, out_dim, 3)

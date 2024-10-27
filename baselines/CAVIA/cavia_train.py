@@ -129,6 +129,7 @@ def main(cfg: DictConfig) -> None:
     print(f"n_params forecaster: {count_parameters(model)}")
     print("params : ", params)
 
+    # epsilon_t = 0
     for epoch in range(epochs):
         model.train()
         step_show = epoch % nupdate == 0
@@ -209,8 +210,8 @@ def main(cfg: DictConfig) -> None:
                     f"{model_dir}/{run_name}.pt",
                 )
         else:
-            if loss_train < best_loss:
-                best_loss = loss_train
+            if loss_test_in < best_loss:
+                best_loss = loss_test_in
                 torch.save(
                     {
                         "cfg": cfg,

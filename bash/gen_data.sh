@@ -13,4 +13,4 @@ set -x
 conda init bash
 conda activate fuels
 
-python3 generate_data.py 
+python3 fuels/datasets/combined.py 

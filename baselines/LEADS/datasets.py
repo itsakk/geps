@@ -5,6 +5,8 @@ from fuels.datasets.lv import LotkaVolterraDataset
 from fuels.datasets.gs import GrayScottDataset
 from fuels.datasets.burgers import Burgers
 from fuels.datasets.kolmo import Turb2d
+from fuels.datasets.combined import CombinedDataset
+from itertools import product
 
 def DataLoaderODE(dataset, minibatch_size, shuffle=True):
     dataloader_params = {
@@ -208,6 +210,21 @@ def param_kolmo(buffer_filepath, batch_size_train=16, batch_size_val=16):
     params = torch.cat((nu.unsqueeze(-1), domain.unsqueeze(-1)), axis = 1)
     return dataloader_train, dataloader_test, params
 
+def load_combined(buffer_filepath, train_batch_size = 32, val_batch_size = 32):
+    # Sampled ranges for alphas, beta, delta, gamma
+    alpha= [0.5, 0.75]
+    beta= [0.075, 0.25]
+    delta= [0.25, 0.75]
+    gamma = [0.25, 0.75]
+
+    # Generate the Cartesian product
+    params = torch.tensor(list(product(alpha, beta, delta, gamma)))
+    trainset = CombinedDataset(buffer_filepath + '_train.h5', 'train', dt = 0.1)
+    valset = CombinedDataset(buffer_filepath + '_val.h5', 'val', dt = 0.1)
+    train_loader = DataLoader(trainset, batch_size= train_batch_size, shuffle=False, num_workers=1, pin_memory=True)
+    val_loader = DataLoader(valset, batch_size=val_batch_size, shuffle=False, num_workers=1, pin_memory=True)
+    return train_loader, val_loader, params
+
 def init_dataloaders(dataset, batch_size_train, batch_size_val, buffer_filepath=None):
     assert buffer_filepath is not None
     
@@ -221,6 +238,8 @@ def init_dataloaders(dataset, batch_size_train, batch_size_val, buffer_filepath=
         return param_burgers(buffer_filepath, batch_size_train, batch_size_val)
     elif dataset == 'kolmo':
         return param_kolmo(buffer_filepath, batch_size_train, batch_size_val)
+    elif dataset == 'combined':
+        return load_combined(buffer_filepath, batch_size_train, batch_size_val)
     
 def param_adapt_pendulum(buffer_filepath, batch_size_train=25, batch_size_val=25):
     dataset_train_params = {

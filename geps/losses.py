@@ -1,12 +1,12 @@
 import torch
-from fuels.model.layers import *
+from geps.model.layers import *
 import einops
 
 def l2_penalty(model):
     # L2 penalty
     l2_penalty = 0
     for layer in model.children():
-        if isinstance(layer, ROCALinear):
+        if isinstance(layer, GEPSLinear):
             l2_penalty += torch.norm(layer.A, p=2) ** 2 + torch.norm(layer.B, p=2) ** 2
         elif isinstance(layer, Swish):
             l2_penalty += torch.norm(layer.linear.weight, p=2) ** 2

@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="fuels",
+    name="geps",
     version="0.0.1",
     description="Package for learning to adapt parametric PDEs",
     author="Armand Kassai",
@@ -17,6 +17,6 @@ setup(
         "h5py",
         "torchdiffeq",
     ],
-    package_dir={"fuels": "fuels"},
+    package_dir={"geps": "geps"},
     packages=find_packages(),
 )

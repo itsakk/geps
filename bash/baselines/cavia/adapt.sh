@@ -15,7 +15,7 @@ conda activate fuels
 
 dataset_name='pendulum'
 batch_size_train=1
-batch_size_val=16
+batch_size_val=32
 epochs=10
 inner_lr=0.1
 outer_lr=0.001
@@ -24,7 +24,7 @@ seed=123
 hidden_c=64
 state_c=2
 ctx_dim=2
-run_name='dauntless-sound-1943'
+run_name='deep-bush-2267'
 
 python3 baselines/CAVIA/cavia_adapt.py "data.dataset_name=$dataset_name" "optim.batch_size_train=$batch_size_train" "optim.batch_size_val=$batch_size_val" "data.seed=$seed" "optim.epochs=$epochs" "optim.inner_lr=$inner_lr" "optim.outer_lr=$outer_lr" "model.hidden_c=$hidden_c" "model.state_c=$state_c" "optim.init_type=$init_type" "optim.inner_steps=$inner_steps" "optim.test_inner_steps=$test_inner_steps" "model.ctx_dim=$ctx_dim" "pretrain.run_name=$run_name"
 

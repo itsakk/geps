@@ -145,7 +145,6 @@ class Turb2d(Dataset):
     def __getitem__(self, index):
         env = index // self.n_data_per_env
         env_index = index % self.n_data_per_env
-
         if self.data.get(str(index)) is None:
 
             domain_size = self.params_eq[env]['domain'] * torch.pi

@@ -124,6 +124,7 @@ def main(cfg: DictConfig) -> None:
     print(f"n_params forecaster: {count_parameters(model)}")
     print("params : ", params)
 
+    # epsilon_t = 0
     for epoch in range(epochs):
         model.train()
         step_show = epoch % nupdate == 0
@@ -136,7 +137,7 @@ def main(cfg: DictConfig) -> None:
         for _, data in enumerate(train):
             states = data['states'].to(device)
             n_samples = len(data['states'])
-            env = data['env'][0].item()
+            env = int(data['env'][0].item())
             t = data['t'][0].to(device)
 
             outputs = model(states, t, env, epsilon_t)
@@ -158,7 +159,7 @@ def main(cfg: DictConfig) -> None:
             for i, data_test in enumerate(test):
                 states = data_test['states'].to(device)
                 n_samples = len(data_test['states'])
-                env = data_test['env'][0].item()
+                env = int(data_test['env'][0].item())
                 t = data_test['t'][0].to(device)
 
                 outputs = model(states, t, env)

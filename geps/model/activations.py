@@ -161,3 +161,11 @@ class Swish(nn.Module):
         if len(x.shape) == 4:
             softplus = softplus[..., None, None]
         return (x * torch.sigmoid_(x * softplus)).div_(1.1)
+    
+class SwishNormal(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.beta = nn.Parameter(torch.tensor([0.5]))
+
+    def forward(self, x):
+        return (x * torch.sigmoid_(x * F.softplus(self.beta))).div_(1.1)

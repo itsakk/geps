@@ -127,7 +127,8 @@ def main(cfg: DictConfig) -> None:
     print("num_env : ", num_env)
     print(f"n_params forecaster: {count_parameters(model)}")
     print("params : ", params)
-
+    epsilon_t = 0
+    
     for epoch in range(epochs):
 
         step_show = epoch % nupdate == 0

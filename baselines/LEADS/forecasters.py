@@ -17,7 +17,7 @@ class Forecaster(nn.Module):
         if dataset_name == 'gs':
             self.left_model  = nn.ModuleList([CNN2D(in_dim, out_dim, 3) for _ in range(n_left)])
             self.right_model = nn.ModuleList([CNN2D(in_dim, out_dim, 3) for _ in range(n_right)])
-        if dataset_name == 'burgers':
+        if dataset_name in ['burgers', 'combined']:
             self.left_model  = nn.ModuleList([CNN1D(in_dim, out_dim, 7) for _ in range(n_left)])
             self.right_model = nn.ModuleList([CNN1D(in_dim, out_dim, 7) for _ in range(n_right)])          
         if dataset_name == 'kolmo':

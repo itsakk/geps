@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=fuels
-#SBATCH --partition=jazzy
+#SBATCH --partition=funky
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
 #SBATCH --time=10000
@@ -13,16 +13,16 @@ set -x
 conda init bash
 conda activate fuels
 
-dataset_name='pendulum'
-batch_size_train=8
+dataset_name='combined'
+batch_size_train=16
 batch_size_val=16
 epochs=20000
 inner_lr=1.0
 outer_lr=0.001
 inner_steps=5
-seed=123
+seed=14
 hidden_c=64
-state_c=2
+state_c=1
 init_type={'weight':{'type':'orthogonal','gain':1}}
 ctx_dim=2
 tau=0.1

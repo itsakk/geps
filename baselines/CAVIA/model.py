@@ -195,7 +195,7 @@ class CAVIACNN1D(nn.Module):
         self.conv3 = nn.Conv1d(hidden_c, hidden_c, kernel_size, padding = self.padding, padding_mode = "circular", bias = True)
         self.act3 = Swish()
         self.conv4 = nn.Conv1d(hidden_c, state_c, kernel_size, padding = self.padding, padding_mode = "circular", bias = True)
-        self.x = 256
+        self.x = 128
         self.ctx_dec = nn.Linear(ctx_dim, self.x)
 
     def reset_context_params(self):
@@ -262,7 +262,7 @@ class CAVIAMLP(nn.Module):
 def get_nn_model(dataset_name, in_dim, out_dim, ctx_dim):
     if dataset_name == 'pendulum':
         model = CAVIAMLP(in_dim, out_dim, ctx_dim)
-    elif dataset_name == 'burgers':
+    elif dataset_name in ['burgers', 'combined']:
         model = CAVIACNN1D(in_dim, out_dim, 7, ctx_dim)
     elif dataset_name == 'gs':
         model = CAVIACNN2D(in_dim, out_dim, 3, ctx_dim)
