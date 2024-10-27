@@ -1,4 +1,4 @@
-# 0. GEPS: Boosting Generalization in Parametric PDE Neural Solvers through Adaptive Conditioning
+# GEPS: Boosting Generalization in Parametric PDE Neural Solvers through Adaptive Conditioning
 Official PyTorch implementation of GEPS 
 
 <p float="center">
