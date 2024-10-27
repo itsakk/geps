@@ -6,7 +6,7 @@ Official PyTorch implementation of GEPS
 </p>
 
 # 1. Code installation and setup
-## pdegen installation
+## geps installation
 ```
 conda create -n geps python=3.11.0
 pip install -e .
