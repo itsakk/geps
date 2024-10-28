@@ -42,7 +42,7 @@ To cite our work:
 ```
 @article{kassai2024geps,
   title={GEPS: Boosting Generalization in Parametric PDE Neural Solvers through Adaptive Conditioning},
-  author={Kassaï Koupaï, Armand and Misfut Benet, Jorge and Vittaut, Jean-No{\"e}l and Gallinari, Patrick},
+  author={Kassaï Koupaï, Armand and Mifsut Benet, Jorge and Vittaut, Jean-No{\"e}l and Gallinari, Patrick},
   journal={38th Conference on Neural Information Processing Systems (NeurIPS 2024)},
   year={2024}
 }
