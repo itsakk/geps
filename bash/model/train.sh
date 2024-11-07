@@ -1,27 +1,27 @@
 #!/bin/bash
-#SBATCH --job-name=fuels
-#SBATCH --partition=hard
-#SBATCH --constraint "GPUM48G"
-#SBATCH --nodes=1
-#SBATCH --gpus-per-node=1
-#SBATCH --time=10000
-#SBATCH --output=slurm_run/fuels/%x-%j.out
-#SBATCH --error=slurm_run/fuels/%x-%j.err
+#SBATCH --job-name=xxx
+#SBATCH --partition=xxx
+#SBATCH --constraint xxx
+#SBATCH --nodes=xxx
+#SBATCH --gpus-per-node=xxx
+#SBATCH --time=xxx
+#SBATCH --output=xxx
+#SBATCH --error=xxx
 
 source $MINICONDA_PATH/etc/profile.d/conda.sh
 
 set -x
 conda init bash
-conda activate fuels
+conda activate geps
 
-dataset_name='combined_big' # pendulum, burgers, gs, lv, combined, gs_multi
+dataset_name='xxx' # pendulum, burgers, gs, lv, combined, gs_multi
 batch_size_train=128 # 4 if lv, 16 if pendulum, 1 if gs, 4 if burgers
 batch_size_val=128
-epochs=7000
+epochs=20000
 lr=0.01
 seed=42
 hidden_c=64
-state_c=1 # 2 others, 1 if burgers-kolmo
+state_c=1
 code_c=8
 is_complete=True
 type_augment=''
