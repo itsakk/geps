@@ -7,7 +7,7 @@ defaults:
 
 data:
   dataset_name: "pendulum"
-  dir: "/home/kassai/code/FUELS/exp_gen/train"
+  dir: "xxx"
   seed: 123
 
 optim:
@@ -33,8 +33,8 @@ model:
   teacher_forcing_update: 10
 
 wandb:
-  entity: "spatiotemp-isir"
-  project: "fuels"
+  entity: "xxx"
+  project: "xxx"
   name: 
   id: 
   dir:
