@@ -7,7 +7,7 @@ defaults:
 
 data:
   dataset_name: "pendulum"
-  dir: "/home/kassai/code/FUELS/exp_gen/adapt"
+  dir: "xxx"
   seed: 123
 
 optim:
@@ -35,8 +35,8 @@ pretrain:
   run_name:
   
 wandb:
-  entity: "spatiotemp-isir"
-  project: "fuels"
+  entity: "xxx"
+  project: "xxx"
   name: 
   id: 
   dir:
