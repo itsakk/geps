@@ -13,4 +13,4 @@ set -x
 conda init bash
 conda activate fuels
 
-python3 fuels/datasets/combined.py 
+python3 geps/datasets/combined.py 
