@@ -11,6 +11,6 @@ source $MINICONDA_PATH/etc/profile.d/conda.sh
 
 set -x
 conda init bash
-conda activate fuels
+conda activate geps
 
 python3 geps/datasets/combined.py 
