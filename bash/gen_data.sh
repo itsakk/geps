@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=fuels
-#SBATCH --partition=jazzy
+#SBATCH --job-name=xxx
+#SBATCH --partition=xxx
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
 #SBATCH --time=10000
-#SBATCH --output=slurm_run/fuels/%x-%j.out
-#SBATCH --error=slurm_run/fuels/%x-%j.err
+#SBATCH --output=slurm_run/xxx/%x-%j.out
+#SBATCH --error=slurm_run/xxx/%x-%j.err
 
 source $MINICONDA_PATH/etc/profile.d/conda.sh
 
